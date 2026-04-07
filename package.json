@@ -1,0 +1,20 @@
+{
+  "name": "spatialverse-cmms",
+  "version": "1.0.0",
+  "description": "SpatialVerse CMMS - Spatially-aware Computerized Maintenance Management System",
+  "private": true,
+  "workspaces": [
+    "shared",
+    "api",
+    "web"
+  ],
+  "scripts": {
+    "dev:api": "npm run dev -w api",
+    "dev:web": "npm run dev -w web",
+    "build:web": "npm run build -w web",
+    "build:api": "npm run build -w api",
+    "deploy:web": "npm run deploy -w web"
+  },
+  "author": "TwinMatrix Technologies",
+  "license": "PROPRIETARY"
+}
