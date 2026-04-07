@@ -79,6 +79,7 @@ import {
   nextStatusMap,
   Priority,
   prioritySLAHours,
+  RootCause,
   technicians,
   WorkOrder,
   WorkOrderStatus,
@@ -102,6 +103,27 @@ const priorityColors: Record<Priority, string> = {
   P3: '#FFEE58',
   P4: '#66BB6A',
 };
+
+const rootCauseOptions: { value: RootCause; label: string }[] = [
+  { value: 'age_wear', label: 'Age / Wear' },
+  { value: 'abuse_misuse', label: 'Abuse / Misuse' },
+  { value: 'design_flaw', label: 'Design Flaw' },
+  { value: 'installation_error', label: 'Installation Error' },
+  { value: 'environmental', label: 'Environmental' },
+  { value: 'unknown', label: 'Unknown' },
+];
+
+const rootCauseLabelByValue = rootCauseOptions.reduce<Record<RootCause, string>>(
+  (map, option) => ({ ...map, [option.value]: option.label }),
+  {
+    age_wear: 'Age / Wear',
+    abuse_misuse: 'Abuse / Misuse',
+    design_flaw: 'Design Flaw',
+    installation_error: 'Installation Error',
+    environmental: 'Environmental',
+    unknown: 'Unknown',
+  }
+);
 
 type CreateWorkOrderFormData = {
   assetId: string;
@@ -328,7 +350,15 @@ function KanbanColumn({
 }
 
 export default function WorkOrders() {
-  const { selectedSiteId, workOrders, updateWorkOrderStatus, createWorkOrder, toggleChecklistItem, addWorkOrderComment } =
+  const {
+    selectedSiteId,
+    workOrders,
+    updateWorkOrderStatus,
+    createWorkOrder,
+    toggleChecklistItem,
+    addWorkOrderComment,
+    saveRCA,
+  } =
     useStore();
   const location = useLocation();
   const now = useMinuteTicker();
@@ -594,6 +624,9 @@ export default function WorkOrders() {
             onUpdateStatus={(status, comment) =>
               updateWorkOrderStatus({ workOrderId: selectedWO.id, status, comment })
             }
+            onSaveRCA={(rootCause, failureMode, correctiveAction) =>
+              saveRCA(selectedWO.id, rootCause, failureMode, correctiveAction)
+            }
           />
         )}
       </Drawer>
@@ -643,6 +676,7 @@ function WODetailPanel({
   onToggleChecklist,
   onAddComment,
   onUpdateStatus,
+  onSaveRCA,
 }: {
   wo: WorkOrder;
   now: Date;
@@ -650,24 +684,37 @@ function WODetailPanel({
   onToggleChecklist: (checklistItemId: string) => void;
   onAddComment: (message: string) => void;
   onUpdateStatus: (status: WorkOrderStatus, comment?: string) => void;
+  onSaveRCA: (rootCause: RootCause, failureMode: string, correctiveAction: string) => void;
 }) {
   const [activeTab, setActiveTab] = useState(0);
   const [updateStatusOpen, setUpdateStatusOpen] = useState(false);
   const [nextStatus, setNextStatus] = useState<WorkOrderStatus | ''>('');
   const [statusComment, setStatusComment] = useState('');
   const [newComment, setNewComment] = useState('');
+  const [rcaEditMode, setRcaEditMode] = useState(false);
+  const [rootCauseDraft, setRootCauseDraft] = useState<RootCause | ''>('');
+  const [failureModeDraft, setFailureModeDraft] = useState('');
+  const [correctiveActionDraft, setCorrectiveActionDraft] = useState('');
   const asset = getAssetById(wo.assetId);
   const reportedBy = wo.reportedById ? getUserById(wo.reportedById) : null;
   const site = getSiteById(wo.siteId);
   const statusColor = statusColumns.find((column) => column.id === wo.status)?.color || '#666';
   const { progress, isOverdue, timeLeft } = getSLAState(wo.createdAt, wo.slaDeadline, now);
   const availableNextStatuses = nextStatusMap[wo.status] || [];
+  const isCompletedOrClosed = ['resolved', 'closed'].includes(wo.status);
+  const hasRCA = Boolean(wo.rootCause && wo.failureMode?.trim() && wo.correctiveAction?.trim());
 
   useEffect(() => {
+    const workOrderHasRCA = Boolean(wo.rootCause && wo.failureMode?.trim() && wo.correctiveAction?.trim());
+
     setActiveTab(0);
     setStatusComment('');
     setNewComment('');
     setNextStatus(availableNextStatuses[0] || '');
+    setRootCauseDraft(wo.rootCause || '');
+    setFailureModeDraft(wo.failureMode || '');
+    setCorrectiveActionDraft(wo.correctiveAction || '');
+    setRcaEditMode(!workOrderHasRCA);
   }, [wo.id, availableNextStatuses]);
 
   const handleSaveStatusUpdate = () => {
@@ -681,6 +728,15 @@ function WODetailPanel({
     if (!newComment.trim()) return;
     onAddComment(newComment.trim());
     setNewComment('');
+  };
+
+  const handleSaveRCA = () => {
+    if (!rootCauseDraft || !failureModeDraft.trim() || !correctiveActionDraft.trim()) {
+      return;
+    }
+
+    onSaveRCA(rootCauseDraft, failureModeDraft, correctiveActionDraft);
+    setRcaEditMode(false);
   };
 
   const timelineEntries = [...(wo.timeline || [])].sort(
@@ -852,6 +908,7 @@ function WODetailPanel({
           <Tab label="Timeline" />
           <Tab label="Checklist" />
           <Tab label="Updates" />
+          {isCompletedOrClosed && <Tab label="RCA" />}
         </Tabs>
 
         {activeTab === 0 && (
@@ -944,6 +1001,98 @@ function WODetailPanel({
                 <SendIcon />
               </IconButton>
             </Box>
+          </Box>
+        )}
+
+        {isCompletedOrClosed && activeTab === 3 && (
+          <Box sx={{ mt: 1 }}>
+            {!rcaEditMode && hasRCA ? (
+              <Box>
+                <Grid container spacing={1.5}>
+                  <Grid size={{ xs: 12 }}>
+                    <Typography variant="caption" color="text.secondary">
+                      Root Cause
+                    </Typography>
+                    <Typography variant="body2" fontWeight={600}>
+                      {wo.rootCause ? rootCauseLabelByValue[wo.rootCause] : '-'}
+                    </Typography>
+                  </Grid>
+                  <Grid size={{ xs: 12 }}>
+                    <Typography variant="caption" color="text.secondary">
+                      Failure Mode
+                    </Typography>
+                    <Typography variant="body2">{wo.failureMode || '-'}</Typography>
+                  </Grid>
+                  <Grid size={{ xs: 12 }}>
+                    <Typography variant="caption" color="text.secondary">
+                      Corrective Action
+                    </Typography>
+                    <Typography variant="body2">{wo.correctiveAction || '-'}</Typography>
+                  </Grid>
+                </Grid>
+                <Box sx={{ mt: 2 }}>
+                  <Button variant="outlined" onClick={() => setRcaEditMode(true)}>
+                    Edit RCA
+                  </Button>
+                </Box>
+              </Box>
+            ) : (
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                <FormControl fullWidth>
+                  <InputLabel>Root Cause</InputLabel>
+                  <Select
+                    value={rootCauseDraft}
+                    label="Root Cause"
+                    onChange={(event: SelectChangeEvent<RootCause | ''>) =>
+                      setRootCauseDraft(event.target.value as RootCause | '')
+                    }
+                  >
+                    {rootCauseOptions.map((rootCauseOption) => (
+                      <MenuItem key={rootCauseOption.value} value={rootCauseOption.value}>
+                        {rootCauseOption.label}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+                <TextField
+                  label="Failure Mode"
+                  value={failureModeDraft}
+                  onChange={(event) => setFailureModeDraft(event.target.value)}
+                  placeholder="e.g. Condenser airflow restriction"
+                  fullWidth
+                />
+                <TextField
+                  label="Corrective Action"
+                  value={correctiveActionDraft}
+                  onChange={(event) => setCorrectiveActionDraft(event.target.value)}
+                  multiline
+                  minRows={3}
+                  fullWidth
+                />
+                <Box sx={{ display: 'flex', gap: 1 }}>
+                  <Button
+                    variant="contained"
+                    onClick={handleSaveRCA}
+                    disabled={!rootCauseDraft || !failureModeDraft.trim() || !correctiveActionDraft.trim()}
+                  >
+                    Save RCA
+                  </Button>
+                  {hasRCA && (
+                    <Button
+                      variant="text"
+                      onClick={() => {
+                        setRootCauseDraft(wo.rootCause || '');
+                        setFailureModeDraft(wo.failureMode || '');
+                        setCorrectiveActionDraft(wo.correctiveAction || '');
+                        setRcaEditMode(false);
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                  )}
+                </Box>
+              </Box>
+            )}
           </Box>
         )}
       </Box>

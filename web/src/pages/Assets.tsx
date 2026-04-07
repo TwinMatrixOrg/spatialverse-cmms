@@ -51,6 +51,7 @@ import {
   sites,
   Asset,
   AssetType,
+  RootCause,
   WorkOrder,
   PMSchedule,
   calculateAssetHealth,
@@ -95,6 +96,47 @@ const typeColors: Record<AssetType, string> = {
   Structural: '#78909C',
   'IT/AV': '#7C4DFF',
   General: '#90A4AE',
+};
+
+const rootCauseLabels: Record<RootCause, string> = {
+  age_wear: 'Age / Wear',
+  abuse_misuse: 'Abuse / Misuse',
+  design_flaw: 'Design Flaw',
+  installation_error: 'Installation Error',
+  environmental: 'Environmental',
+  unknown: 'Unknown',
+};
+
+const getMTBFMeta = (mtbfDays?: number) => {
+  if (typeof mtbfDays !== 'number') {
+    return {
+      color: '#78909C',
+      bg: alpha('#78909C', 0.14),
+      label: 'MTBF: N/A',
+    };
+  }
+
+  if (mtbfDays > 90) {
+    return {
+      color: '#66BB6A',
+      bg: alpha('#66BB6A', 0.15),
+      label: `MTBF: ${mtbfDays}d`,
+    };
+  }
+
+  if (mtbfDays >= 30) {
+    return {
+      color: '#FFA726',
+      bg: alpha('#FFA726', 0.15),
+      label: `MTBF: ${mtbfDays}d`,
+    };
+  }
+
+  return {
+    color: '#EF5350',
+    bg: alpha('#EF5350', 0.15),
+    label: `MTBF: ${mtbfDays}d`,
+  };
 };
 
 export default function Assets() {
@@ -146,6 +188,27 @@ export default function Assets() {
     workOrders,
     pmSchedules,
   ]);
+
+  const topFailingAssets = useMemo(() => {
+    const scopedAssets = selectedSiteId ? assets.filter((asset) => asset.siteId === selectedSiteId) : assets;
+
+    return scopedAssets
+      .map((asset) => ({
+        ...asset,
+        failureCount: asset.failureHistory?.length || 0,
+      }))
+      .filter((asset) => asset.failureCount > 0)
+      .sort((assetA, assetB) => {
+        if (assetB.failureCount !== assetA.failureCount) {
+          return assetB.failureCount - assetA.failureCount;
+        }
+
+        const mtbfA = assetA.mtbfDays ?? Number.MAX_SAFE_INTEGER;
+        const mtbfB = assetB.mtbfDays ?? Number.MAX_SAFE_INTEGER;
+        return mtbfA - mtbfB;
+      })
+      .slice(0, 5);
+  }, [selectedSiteId]);
 
   // Initialize map
   useEffect(() => {
@@ -331,6 +394,61 @@ export default function Assets() {
       </Box>
 
       {/* Content */}
+      <Card sx={{ mb: 2 }}>
+        <CardContent sx={{ py: 1.5 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.25 }}>
+            <Typography variant="subtitle2" fontWeight={700}>
+              Top Failing Assets
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              Based on recorded failure history
+            </Typography>
+          </Box>
+          {topFailingAssets.length === 0 ? (
+            <Typography variant="body2" color="text.secondary">
+              No failure history recorded for this scope.
+            </Typography>
+          ) : (
+            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+              {topFailingAssets.map((asset) => {
+                const mtbfMeta = getMTBFMeta(asset.mtbfDays);
+
+                return (
+                  <Box
+                    key={asset.id}
+                    sx={{
+                      border: '1px solid',
+                      borderColor: 'divider',
+                      borderRadius: 2,
+                      px: 1.5,
+                      py: 1,
+                      minWidth: 180,
+                    }}
+                  >
+                    <Typography variant="body2" fontWeight={600}>
+                      {asset.name}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.5 }}>
+                      {asset.type} • {asset.failureCount} failures
+                    </Typography>
+                    <Chip
+                      size="small"
+                      label={mtbfMeta.label}
+                      sx={{
+                        backgroundColor: mtbfMeta.bg,
+                        color: mtbfMeta.color,
+                        fontWeight: 600,
+                        height: 22,
+                      }}
+                    />
+                  </Box>
+                );
+              })}
+            </Box>
+          )}
+        </CardContent>
+      </Card>
+
       <Box sx={{ flex: 1, display: 'flex', gap: 2, overflow: 'hidden' }}>
         {/* Table */}
         {(viewMode === 'split' || viewMode === 'table') && (
@@ -550,6 +668,7 @@ function AssetDetailPanel({
         <Tab label="Details" />
         <Tab label={`Work Orders (${assetWOs.length})`} />
         <Tab label={`PM Schedule (${assetPMs.length})`} />
+        <Tab label={`Failure History (${asset.failureHistory?.length || 0})`} />
       </Tabs>
 
       <Box sx={{ flex: 1, overflow: 'auto', p: 2 }}>
@@ -748,6 +867,59 @@ function AssetDetailPanel({
               ))
             )}
           </List>
+        )}
+
+        {tab === 3 && (
+          <Box>
+            <Box sx={{ mb: 1.5 }}>
+              {(() => {
+                const mtbfMeta = getMTBFMeta(asset.mtbfDays);
+                return (
+                  <Chip
+                    label={mtbfMeta.label}
+                    sx={{
+                      backgroundColor: mtbfMeta.bg,
+                      color: mtbfMeta.color,
+                      fontWeight: 700,
+                    }}
+                  />
+                );
+              })()}
+            </Box>
+
+            {(asset.failureHistory?.length || 0) === 0 ? (
+              <Typography variant="body2" color="text.secondary">
+                No failure events recorded.
+              </Typography>
+            ) : (
+              <TableContainer component={Paper} variant="outlined">
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Date</TableCell>
+                      <TableCell>WO #</TableCell>
+                      <TableCell>Failure Mode</TableCell>
+                      <TableCell>Root Cause</TableCell>
+                      <TableCell align="right">Downtime (h)</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {[...(asset.failureHistory || [])]
+                      .sort((eventA, eventB) => new Date(eventB.date).getTime() - new Date(eventA.date).getTime())
+                      .map((event) => (
+                        <TableRow key={`${event.woId}-${event.date}`}>
+                          <TableCell>{format(new Date(event.date), 'MMM d, yyyy')}</TableCell>
+                          <TableCell>{event.woId.toUpperCase()}</TableCell>
+                          <TableCell>{event.failureMode}</TableCell>
+                          <TableCell>{rootCauseLabels[event.rootCause]}</TableCell>
+                          <TableCell align="right">{event.downtimeHours.toFixed(1)}</TableCell>
+                        </TableRow>
+                      ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            )}
+          </Box>
         )}
       </Box>
     </Box>

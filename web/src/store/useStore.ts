@@ -16,6 +16,7 @@ import {
   Priority,
   PMSchedule,
   AppNotification,
+  RootCause,
   pmSchedules as initialPMSchedules,
   notifications as initialNotifications,
 } from '../data/mockData';
@@ -52,6 +53,12 @@ interface AppState {
   updateWorkOrderStatus: (input: UpdateWorkOrderStatusInput) => void;
   toggleChecklistItem: (workOrderId: string, checklistItemId: string) => void;
   addWorkOrderComment: (workOrderId: string, message: string, userId?: string) => void;
+  saveRCA: (
+    workOrderId: string,
+    rootCause: RootCause,
+    failureMode: string,
+    correctiveAction: string
+  ) => void;
   pmSchedules: PMSchedule[];
   notifications: AppNotification[];
   assetHealthBandFilter: AssetHealthBand;
@@ -275,6 +282,39 @@ export const useStore = create<AppState>()(
                   id: `cm-${workOrder.id}-${timestamp}`,
                   userId,
                   message: trimmedMessage,
+                  createdAt: timestamp,
+                },
+              ],
+            };
+          }),
+        }));
+      },
+      saveRCA: (workOrderId, rootCause, failureMode, correctiveAction) => {
+        const timestamp = new Date().toISOString();
+        const trimmedFailureMode = failureMode.trim();
+        const trimmedCorrectiveAction = correctiveAction.trim();
+
+        set((state) => ({
+          workOrders: state.workOrders.map((workOrder) => {
+            if (workOrder.id !== workOrderId) {
+              return workOrder;
+            }
+
+            const rcaExists = Boolean(workOrder.rootCause || workOrder.failureMode || workOrder.correctiveAction);
+
+            return {
+              ...workOrder,
+              rootCause,
+              failureMode: trimmedFailureMode,
+              correctiveAction: trimmedCorrectiveAction,
+              updatedAt: timestamp,
+              timeline: [
+                ...(workOrder.timeline || []),
+                {
+                  id: `tl-${workOrder.id}-rca-${timestamp}`,
+                  type: 'rca',
+                  description: rcaExists ? 'RCA updated' : 'RCA captured',
+                  userId: 'user-2',
                   createdAt: timestamp,
                 },
               ],
