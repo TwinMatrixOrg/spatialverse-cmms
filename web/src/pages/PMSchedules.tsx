@@ -264,10 +264,17 @@ export default function PMSchedules() {
   }, [filteredPMs]);
 
   return (
-    <Box sx={{ height: 'calc(100vh - 140px)', display: 'flex', flexDirection: 'column' }}>
+    <Box
+      sx={{
+        height: 'calc(100vh - 140px)',
+        display: 'flex',
+        flexDirection: 'column',
+        overflowX: 'hidden',
+      }}
+    >
       {/* Header */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4" sx={{ fontWeight: 700 }}>
+        <Typography variant="h4" sx={{ fontWeight: 700, fontSize: { xs: '1.65rem', sm: '2rem' } }}>
           PM Schedules
         </Typography>
       </Box>
@@ -279,7 +286,7 @@ export default function PMSchedules() {
           placeholder="Search schedules..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          sx={{ minWidth: 220 }}
+          sx={{ minWidth: { xs: '100%', sm: 220 }, flex: { xs: '1 1 100%', sm: '0 1 auto' } }}
           InputProps={{
             startAdornment: (
               <InputAdornment position="start">
@@ -322,11 +329,12 @@ export default function PMSchedules() {
           exclusive
           onChange={(_, value) => value && setViewMode(value)}
           size="small"
+          sx={{ width: { xs: '100%', sm: 'auto' } }}
         >
-          <ToggleButton value="calendar">
+          <ToggleButton value="calendar" sx={{ flex: { xs: 1, sm: 'initial' } }}>
             <CalendarIcon sx={{ mr: 0.5 }} /> Calendar
           </ToggleButton>
-          <ToggleButton value="list">
+          <ToggleButton value="list" sx={{ flex: { xs: 1, sm: 'initial' } }}>
             <ListIcon sx={{ mr: 0.5 }} /> List
           </ToggleButton>
         </ToggleButtonGroup>
@@ -457,18 +465,19 @@ export default function PMSchedules() {
 
       {/* List View */}
       {viewMode === 'list' && (
-        <TableContainer component={Paper} sx={{ flex: 1, overflow: 'auto' }}>
-          <Table stickyHeader>
+        <TableContainer component={Paper} sx={{ flex: 1, overflow: 'auto', maxWidth: '100%' }}>
+          <Table stickyHeader size="small">
             <TableHead>
               <TableRow>
                 <TableCell>PM Name</TableCell>
+                <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>Description</TableCell>
                 <TableCell>Asset</TableCell>
-                <TableCell>Frequency</TableCell>
-                <TableCell>Last Done</TableCell>
+                <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>Frequency</TableCell>
+                <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>Last Done</TableCell>
                 <TableCell>Next Due</TableCell>
                 <TableCell>Status</TableCell>
-                <TableCell>Days Until Due</TableCell>
-                <TableCell>Checklist</TableCell>
+                <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>Days Until Due</TableCell>
+                <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>Checklist</TableCell>
                 <TableCell>Action</TableCell>
               </TableRow>
             </TableHead>
@@ -479,6 +488,7 @@ export default function PMSchedules() {
                 const dueStatus = getDueStatus(pm);
                 const dueMeta = getDaysUntilDueMeta(pm);
                 const canGenerateWO = dueStatus.key !== 'completed';
+                const description = pm.checklist.slice(0, 2).join(' • ');
 
                 return (
                   <TableRow
@@ -486,10 +496,15 @@ export default function PMSchedules() {
                     hover
                     onClick={() => setSelectedPM(pm)}
                     sx={{ cursor: 'pointer' }}
-                  >
+                    >
                     <TableCell>
                       <Typography variant="body2" fontWeight={600}>
                         {pm.name}
+                      </Typography>
+                    </TableCell>
+                    <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>
+                      <Typography variant="body2" color="text.secondary" noWrap>
+                        {description || '-'}
                       </Typography>
                     </TableCell>
                     <TableCell>
@@ -498,12 +513,12 @@ export default function PMSchedules() {
                         {site?.name}
                       </Typography>
                     </TableCell>
-                    <TableCell>
+                    <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>
                       <Typography variant="body2" sx={{ textTransform: 'capitalize' }}>
                         {pm.frequency}
                       </Typography>
                     </TableCell>
-                    <TableCell>
+                    <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>
                       {pm.lastDoneDate ? format(new Date(pm.lastDoneDate), 'MMM d, yyyy') : '-'}
                     </TableCell>
                     <TableCell>
@@ -520,12 +535,12 @@ export default function PMSchedules() {
                         }}
                       />
                     </TableCell>
-                    <TableCell>
+                    <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>
                       <Typography variant="body2" sx={{ color: dueMeta.color, fontWeight: 600 }}>
                         {dueMeta.label}
                       </Typography>
                     </TableCell>
-                    <TableCell>
+                    <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>
                       <Button
                         size="small"
                         variant="outlined"

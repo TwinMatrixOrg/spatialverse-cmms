@@ -2,6 +2,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Box,
   Drawer,
+  SwipeableDrawer,
   List,
   ListItem,
   ListItemButton,
@@ -287,10 +288,11 @@ export default function Sidebar({ open, onClose, drawerWidth, collapsedWidth, is
     <>
       {/* Mobile Drawer */}
       {isMobile && (
-        <Drawer
-          variant="temporary"
+        <SwipeableDrawer
           open={open}
           onClose={onClose}
+          onOpen={() => {}}
+          disableDiscovery={false}
           ModalProps={{ keepMounted: true }}
           sx={{
             display: { xs: 'block', md: 'none' },
@@ -301,7 +303,7 @@ export default function Sidebar({ open, onClose, drawerWidth, collapsedWidth, is
           }}
         >
           {drawerContent}
-        </Drawer>
+        </SwipeableDrawer>
       )}
 
       {/* Desktop Drawer */}
