@@ -51,3 +51,9 @@ body {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* Hide MapLibre attribution and logo across all map instances */
+.maplibregl-ctrl-attrib,
+.maplibregl-ctrl-logo {
+  display: none !important;
+}

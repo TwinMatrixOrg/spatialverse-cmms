@@ -1,4 +1,4 @@
-// Mock data for SpatialVerse CMMS - AWC Malaysia Properties
+// Mock data for SpatialVerse Pulse - AWC Malaysia Properties
 
 export type Priority = 'P1' | 'P2' | 'P3' | 'P4';
 export type WorkOrderStatus = 'open' | 'assigned' | 'in_progress' | 'pending_parts' | 'resolved' | 'closed';

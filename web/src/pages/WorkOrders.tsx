@@ -245,8 +245,8 @@ function KanbanColumn({
   return (
     <Box
       sx={{
+        width: 280,
         minWidth: 280,
-        maxWidth: 320,
         flexShrink: 0,
         display: 'flex',
         flexDirection: 'column',
@@ -290,7 +290,8 @@ function KanbanColumn({
           backgroundColor: theme.palette.mode === 'dark' ? alpha('#fff', 0.02) : alpha('#000', 0.02),
           borderRadius: 2,
           p: 1.5,
-          overflow: 'auto',
+          maxHeight: 'calc(100vh - 320px)',
+          overflowY: 'auto',
         }}
       >
         <SortableContext items={wos.map(w => w.id)} strategy={verticalListSortingStrategy}>
@@ -460,8 +461,10 @@ export default function WorkOrders() {
               display: 'flex',
               gap: 2,
               flex: 1,
-              overflow: 'auto',
-              pb: 2,
+              overflowX: 'auto',
+              overflowY: 'hidden',
+              pb: 1,
+              '& > *': { flexShrink: 0 },
             }}
           >
             {statusColumns.map(column => (

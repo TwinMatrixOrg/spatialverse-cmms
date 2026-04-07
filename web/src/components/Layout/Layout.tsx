@@ -40,18 +40,15 @@ export default function Layout() {
           display: 'flex',
           flexDirection: 'column',
           minHeight: '100vh',
-          ml: isMobile ? 0 : `${drawerWidth}px`,
-          transition: theme.transitions.create('margin', {
-            easing: theme.transitions.easing.sharp,
-            duration: theme.transitions.duration.leavingScreen,
-          }),
+          minWidth: 0,
+          overflow: 'hidden',
         }}
       >
         <TopBar onMenuClick={handleDrawerToggle} />
         <Box
           sx={{
             flexGrow: 1,
-            p: { xs: 2, sm: 3 },
+            p: { xs: 1.5, sm: 2 },
             backgroundColor: 'background.default',
             overflow: 'auto',
           }}

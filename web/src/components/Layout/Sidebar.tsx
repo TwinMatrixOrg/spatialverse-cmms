@@ -113,7 +113,7 @@ export default function Sidebar({ open, onClose, drawerWidth, collapsedWidth, is
                 lineHeight: 1.2,
               }}
             >
-              SpatialVerse
+              SpatialVerse Pulse
             </Typography>
             <Typography
               variant="caption"
@@ -123,7 +123,7 @@ export default function Sidebar({ open, onClose, drawerWidth, collapsedWidth, is
                 letterSpacing: '0.1em',
               }}
             >
-              CMMS
+              FM PLATFORM
             </Typography>
           </Box>
         )}

@@ -183,7 +183,10 @@ export default function AssetMap() {
           flexGrow: 1,
           position: 'relative',
           '& .maplibregl-ctrl-attrib': {
-            fontSize: '10px',
+            display: 'none',
+          },
+          '& .maplibregl-ctrl-logo': {
+            display: 'none',
           },
         }}
       />

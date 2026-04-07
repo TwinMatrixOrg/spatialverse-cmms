@@ -116,27 +116,32 @@ function KPICard({
 
   return (
     <Card sx={{ height: '100%' }}>
-      <CardContent sx={{ p: 2.5 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <Box>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
-              {title}
-            </Typography>
-            <Typography variant="h4" sx={{ fontWeight: 700, color }}>
+      <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
+        <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 1 }}>
+          <Box sx={{ minWidth: 0, flex: 1 }}>
+            <Typography variant="h4" sx={{ fontWeight: 700, color, lineHeight: 1.1, mb: 0.5 }}>
               {value}
             </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.78rem', lineHeight: 1.3 }}>
+              {title}
+            </Typography>
             {subtitle && (
-              <Typography variant="caption" color="text.secondary">
+              <Typography variant="caption" color="text.disabled" sx={{ fontSize: '0.68rem', display: 'block', mt: 0.3 }}>
                 {subtitle}
               </Typography>
             )}
           </Box>
           <Box
             sx={{
-              p: 1.5,
+              p: 1.2,
               borderRadius: 2,
-              backgroundColor: alpha(color, 0.1),
+              backgroundColor: alpha(color, 0.12),
               color,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+              '& .MuiSvgIcon-root': { fontSize: 22 },
             }}
           >
             {icon}
@@ -304,72 +309,41 @@ export default function Dashboard() {
 
   return (
     <Box>
-      <Typography variant="h4" sx={{ fontWeight: 700, mb: 3 }}>
+      <Typography variant="h4" sx={{ fontWeight: 700, mb: 2 }}>
         Dashboard
       </Typography>
 
       {/* KPI Cards */}
-      <Grid container spacing={2} sx={{ mb: 3 }}>
-        <Grid size={{ xs: 12, sm: 6, md: 4, lg: 2.4 }}>
-          <KPICard
-            title="Open Work Orders"
-            value={kpis.openWorkOrders}
-            icon={<WorkOrderIcon />}
-            color={theme.palette.primary.main}
-          />
-        </Grid>
-        <Grid size={{ xs: 12, sm: 6, md: 4, lg: 2.4 }}>
-          <KPICard
-            title="Overdue WOs"
-            value={kpis.overdueWorkOrders}
-            icon={<WarningIcon />}
-            color={theme.palette.error.main}
-          />
-        </Grid>
-        <Grid size={{ xs: 12, sm: 6, md: 4, lg: 2.4 }}>
-          <KPICard
-            title="Total Assets"
-            value={kpis.totalAssets}
-            subtitle={`${kpis.criticalAssets} critical`}
-            icon={<AssetIcon />}
-            color={theme.palette.secondary.main}
-          />
-        </Grid>
-        <Grid size={{ xs: 12, sm: 6, md: 4, lg: 2.4 }}>
-          <KPICard
-            title="PM Compliance"
-            value={`${kpis.pmComplianceRate}%`}
-            icon={<CheckIcon />}
-            color={theme.palette.success.main}
-          />
-        </Grid>
-        <Grid size={{ xs: 12, sm: 6, md: 4, lg: 2.4 }}>
-          <KPICard
-            title="MTTR"
-            value={`${kpis.mttr}h`}
-            subtitle="Mean Time To Repair"
-            icon={<BuildIcon />}
-            color={theme.palette.info.main}
-          />
-        </Grid>
-      </Grid>
+      <Box sx={{ display: 'flex', gap: 2, mb: 3, flexWrap: 'nowrap' }}>
+        {[
+          { title: 'Open Work Orders', value: kpis.openWorkOrders, icon: <WorkOrderIcon />, color: theme.palette.primary.main },
+          { title: 'Overdue WOs', value: kpis.overdueWorkOrders, icon: <WarningIcon />, color: theme.palette.error.main },
+          { title: 'Total Assets', value: kpis.totalAssets, subtitle: `${kpis.criticalAssets} critical`, icon: <AssetIcon />, color: theme.palette.secondary.main },
+          { title: 'PM Compliance', value: `${kpis.pmComplianceRate}%`, icon: <CheckIcon />, color: theme.palette.success.main },
+          { title: 'MTTR', value: `${kpis.mttr}h`, subtitle: 'Avg repair time', icon: <BuildIcon />, color: theme.palette.info.main },
+        ].map((kpi) => (
+          <Box key={kpi.title} sx={{ flex: '1 1 0', minWidth: 0 }}>
+            <KPICard {...kpi} />
+          </Box>
+        ))}
+      </Box>
 
       <Grid container spacing={3}>
         {/* WO Status Chart */}
         <Grid size={{ xs: 12, md: 4 }}>
           <Card sx={{ height: 360 }}>
-            <CardContent>
-              <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
+            <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+              <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>
                 Work Order Status
               </Typography>
-              <ResponsiveContainer width="100%" height={240}>
+              <ResponsiveContainer width="100%" height={220}>
                 <PieChart>
                   <Pie
                     data={pieData}
                     cx="50%"
                     cy="50%"
-                    innerRadius={60}
-                    outerRadius={90}
+                    innerRadius={55}
+                    outerRadius={85}
                     paddingAngle={2}
                     dataKey="value"
                   >
@@ -413,7 +387,11 @@ export default function Dashboard() {
             <CardContent sx={{ p: 0, height: '100%', '&:last-child': { pb: 0 } }}>
               <Box
                 ref={mapContainer}
-                sx={{ width: '100%', height: '100%', borderRadius: 3 }}
+                sx={{
+                  width: '100%', height: '100%', borderRadius: 3,
+                  '& .maplibregl-ctrl-attrib': { display: 'none' },
+                  '& .maplibregl-ctrl-logo': { display: 'none' },
+                }}
               />
             </CardContent>
           </Card>
