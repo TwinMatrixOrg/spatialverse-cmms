@@ -83,6 +83,9 @@ import {
   nextStatusMap,
   Priority,
   prioritySLAHours,
+  Permit,
+  permitStatusLabels,
+  permitTypeLabels,
   technicians,
   WorkOrder,
   WorkOrderApprovalStep,
@@ -158,6 +161,14 @@ function ApprovalStatusChip({ approvalStatus, size = 'small' }: { approvalStatus
     />
   );
 }
+
+const permitStatusColors = {
+  draft: '#90A4AE',
+  issued: '#29B6F6',
+  active: '#66BB6A',
+  closed: '#78909C',
+  cancelled: '#EF5350',
+} as const;
 
 type CreateWorkOrderFormData = {
   assetId: string;
@@ -399,8 +410,10 @@ export default function WorkOrders() {
   const {
     selectedSiteId,
     workOrders,
+    permits,
     updateWorkOrderStatus,
     createWorkOrder,
+    createPermit,
     toggleChecklistItem,
     addWorkOrderComment,
     addLabourEntry,
@@ -694,8 +707,26 @@ export default function WorkOrders() {
         {selectedWO && (
           <WODetailPanel
             wo={selectedWO}
+            permit={permits.find((permit) => permit.workOrderId === selectedWO.id) || null}
             now={now}
             onClose={() => setSelectedWOId(null)}
+            onCreatePermit={() => {
+              const selectedAsset = getAssetById(selectedWO.assetId);
+              createPermit({
+                workOrderId: selectedWO.id,
+                type: 'general',
+                riskLevel:
+                  selectedWO.priority === 'P1'
+                    ? 'high'
+                    : selectedWO.priority === 'P2'
+                      ? 'medium'
+                      : 'low',
+                location:
+                  [selectedAsset?.floor, selectedAsset?.zone].filter(Boolean).join(' • ') ||
+                  selectedAsset?.name ||
+                  'Work Area',
+              });
+            }}
             onToggleChecklist={(checklistItemId) => toggleChecklistItem(selectedWO.id, checklistItemId)}
             onAddComment={(message) => addWorkOrderComment(selectedWO.id, message)}
             onAddLabourEntry={(entry) => addLabourEntry(selectedWO.id, entry)}
@@ -753,8 +784,10 @@ function SLAChip({ createdAt, deadline, now }: { createdAt: string; deadline: st
 
 function WODetailPanel({
   wo,
+  permit,
   now,
   onClose,
+  onCreatePermit,
   onToggleChecklist,
   onAddComment,
   onAddLabourEntry,
@@ -764,8 +797,10 @@ function WODetailPanel({
   onRejectWorkOrder,
 }: {
   wo: WorkOrder;
+  permit: Permit | null;
   now: Date;
   onClose: () => void;
+  onCreatePermit: () => void;
   onToggleChecklist: (checklistItemId: string) => void;
   onAddComment: (message: string) => void;
   onAddLabourEntry: (entry: {
@@ -1118,6 +1153,7 @@ function WODetailPanel({
           <Tab label="Checklist" />
           <Tab label="Updates" />
           <Tab label="Costs" />
+          <Tab label="Permit" />
           <Tab label="Approvals" />
         </Tabs>
 
@@ -1441,6 +1477,62 @@ function WODetailPanel({
         )}
 
         {activeTab === 4 && (
+          <Box sx={{ mt: 1.5 }}>
+            {permit ? (
+              <Box>
+                <Typography variant="subtitle2" fontWeight={700}>
+                  {permit.permitNumber}
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 1, mt: 1, mb: 1.5, flexWrap: 'wrap' }}>
+                  <Chip
+                    size="small"
+                    label={permitTypeLabels[permit.type]}
+                    sx={{
+                      backgroundColor: alpha('#00BCD4', 0.15),
+                      color: 'primary.main',
+                    }}
+                  />
+                  <Chip
+                    size="small"
+                    label={permitStatusLabels[permit.status]}
+                    sx={{
+                      backgroundColor: alpha(permitStatusColors[permit.status], 0.15),
+                      color: permitStatusColors[permit.status],
+                    }}
+                  />
+                </Box>
+                <Typography variant="body2" color="text.secondary">
+                  Location: {permit.location}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Valid: {format(new Date(permit.validFrom), 'MMM d, HH:mm')} -{' '}
+                  {format(new Date(permit.validTo), 'MMM d, HH:mm')}
+                </Typography>
+              </Box>
+            ) : (
+              <Box
+                sx={{
+                  border: '1px dashed',
+                  borderColor: 'divider',
+                  borderRadius: 2,
+                  p: 2,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 1,
+                }}
+              >
+                <Typography variant="body2" color="text.secondary">
+                  No linked permit for this work order.
+                </Typography>
+                <Button variant="contained" onClick={onCreatePermit}>
+                  Create Permit
+                </Button>
+              </Box>
+            )}
+          </Box>
+        )}
+
+        {activeTab === 5 && (
           <Box sx={{ mt: 2 }}>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
               Current approver: {currentApprovalUser.name} ({currentApprovalUser.role})

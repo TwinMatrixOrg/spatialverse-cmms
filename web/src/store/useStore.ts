@@ -2,6 +2,7 @@ import { addHours } from 'date-fns';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import {
+  getUserById,
   getAssetById,
   getChecklistTemplate,
   getDefaultWorkOrderComments,
@@ -16,8 +17,13 @@ import {
   workOrders as seedWorkOrders,
   workOrderStatusLabels,
   Priority,
+  Permit,
+  PermitRiskLevel,
+  PermitStatus,
+  PermitType,
   PMSchedule,
   AppNotification,
+  permits as seedPermits,
   pmSchedules as initialPMSchedules,
   notifications as initialNotifications,
   WorkOrderLabourEntry,
@@ -58,6 +64,17 @@ interface AddPartsEntryInput {
   date?: string;
 }
 
+interface CreatePermitInput {
+  workOrderId: string;
+  type?: PermitType;
+  riskLevel?: PermitRiskLevel;
+  location?: string;
+  issuedById?: string;
+  validFrom?: string;
+  validTo?: string;
+  precautions?: string[];
+}
+
 export type AssetHealthBand = 'all' | 'critical' | 'at_risk' | 'healthy';
 
 interface AppState {
@@ -89,6 +106,11 @@ interface AppState {
     approverName: string,
     comment: string
   ) => void;
+  permits: Permit[];
+  nextPermitSequence: number;
+  createPermit: (input: CreatePermitInput) => Permit;
+  updatePermitStatus: (permitId: string, status: PermitStatus) => void;
+  togglePermitChecklistItem: (permitId: string, checklistItemId: string, completedById?: string) => void;
   pmSchedules: PMSchedule[];
   notifications: AppNotification[];
   assetHealthBandFilter: AssetHealthBand;
@@ -187,6 +209,62 @@ const initialSequence =
     return Math.max(highest, extractSequence(workOrder.number));
   }, 0) + 1;
 
+const permitStatusTransitions: Record<PermitStatus, PermitStatus[]> = {
+  draft: ['issued', 'cancelled'],
+  issued: ['active', 'cancelled'],
+  active: ['closed', 'cancelled'],
+  closed: [],
+  cancelled: [],
+};
+
+const defaultPermitPrecautions = [
+  'Conduct toolbox talk before start of work',
+  'Ensure permit and isolation tags are displayed at work site',
+  'Keep emergency response contact list available on site',
+];
+
+const createDefaultPermitChecklist = (permitId: string): Permit['safetyChecklist'] => [
+  {
+    id: `${permitId}-pre-1`,
+    phase: 'pre',
+    item: 'Review hazards, method statement, and emergency controls',
+    completed: false,
+  },
+  {
+    id: `${permitId}-pre-2`,
+    phase: 'pre',
+    item: 'Verify PPE, tools, and area access control',
+    completed: false,
+  },
+  {
+    id: `${permitId}-during-1`,
+    phase: 'during',
+    item: 'Maintain supervision and periodic hazard checks',
+    completed: false,
+  },
+  {
+    id: `${permitId}-during-2`,
+    phase: 'during',
+    item: 'Keep permit and isolation controls active throughout work',
+    completed: false,
+  },
+  {
+    id: `${permitId}-post-1`,
+    phase: 'post',
+    item: 'Remove temporary controls and restore work area',
+    completed: false,
+  },
+  {
+    id: `${permitId}-post-2`,
+    phase: 'post',
+    item: 'Perform handover briefing and capture closure evidence',
+    completed: false,
+  },
+];
+
+const initialPermitSequence =
+  seedPermits.reduce((highest, permit) => Math.max(highest, extractSequence(permit.permitNumber)), 0) + 1;
+
 export const useStore = create<AppState>()(
   persist(
     (set, get) => ({
@@ -202,6 +280,8 @@ export const useStore = create<AppState>()(
       toggleSidebar: () => set({ sidebarOpen: !get().sidebarOpen }),
       workOrders: hydratedWorkOrders,
       nextWorkOrderSequence: initialSequence,
+      permits: seedPermits,
+      nextPermitSequence: initialPermitSequence,
       pmSchedules: initialPMSchedules,
       notifications: initialNotifications,
       assetHealthBandFilter: 'all',
@@ -375,6 +455,81 @@ export const useStore = create<AppState>()(
           }),
         }));
       },
+      createPermit: (input) => {
+        const existingPermit = get().permits.find((permit) => permit.workOrderId === input.workOrderId);
+        if (existingPermit) {
+          return existingPermit;
+        }
+
+        const now = new Date();
+        const sequence = get().nextPermitSequence;
+        const permitId = `permit-${Date.now()}`;
+        const permitNumber = `PTW-${now.getFullYear()}-${String(sequence).padStart(4, '0')}`;
+        const workOrder = get().workOrders.find((item) => item.id === input.workOrderId);
+        const asset = workOrder ? getAssetById(workOrder.assetId) : null;
+        const issuedById = input.issuedById || 'user-2';
+        const issuedByUser = getUserById(issuedById);
+        const fallbackLocation = [asset?.floor, asset?.zone].filter(Boolean).join(' • ') || asset?.name || 'Work Area';
+
+        const permit: Permit = {
+          id: permitId,
+          workOrderId: input.workOrderId,
+          permitNumber,
+          type: input.type || 'general',
+          status: 'draft',
+          issuedById,
+          issuedByName: issuedByUser ? `${issuedByUser.firstName} ${issuedByUser.lastName}` : 'Duty Manager',
+          validFrom: input.validFrom || now.toISOString(),
+          validTo: input.validTo || addHours(now, 8).toISOString(),
+          location: input.location?.trim() || fallbackLocation,
+          riskLevel: input.riskLevel || 'medium',
+          precautions:
+            input.precautions && input.precautions.length > 0
+              ? input.precautions
+              : [...defaultPermitPrecautions],
+          safetyChecklist: createDefaultPermitChecklist(permitId),
+        };
+
+        set((state) => ({
+          permits: [permit, ...state.permits],
+          nextPermitSequence: state.nextPermitSequence + 1,
+        }));
+
+        return permit;
+      },
+      updatePermitStatus: (permitId, status) => {
+        set((state) => ({
+          permits: state.permits.map((permit) => {
+            if (permit.id !== permitId) {
+              return permit;
+            }
+
+            if (permit.status === status) {
+              return permit;
+            }
+
+            const allowedNextStatuses = permitStatusTransitions[permit.status] || [];
+            if (!allowedNextStatuses.includes(status)) {
+              return permit;
+            }
+
+            if (status === 'closed') {
+              const postWorkComplete = permit.safetyChecklist
+                .filter((item) => item.phase === 'post')
+                .every((item) => item.completed);
+
+              if (!postWorkComplete) {
+                return permit;
+              }
+            }
+
+            return {
+              ...permit,
+              status,
+            };
+          }),
+        }));
+      },
       addLabourEntry: (workOrderId, entry) => {
         if (entry.hours <= 0 || entry.ratePerHour <= 0) {
           return;
@@ -413,6 +568,35 @@ export const useStore = create<AppState>()(
               totalLabourCost,
               totalPartsCost,
               totalCost: totalLabourCost + totalPartsCost,
+            };
+          }),
+        }));
+      },
+      togglePermitChecklistItem: (permitId, checklistItemId, completedById = 'user-2') => {
+        const timestamp = new Date().toISOString();
+
+        set((state) => ({
+          permits: state.permits.map((permit) => {
+            if (permit.id !== permitId) {
+              return permit;
+            }
+
+            return {
+              ...permit,
+              safetyChecklist: permit.safetyChecklist.map((item) => {
+                if (item.id !== checklistItemId) {
+                  return item;
+                }
+
+                const nextCompleted = !item.completed;
+
+                return {
+                  ...item,
+                  completed: nextCompleted,
+                  completedBy: nextCompleted ? completedById : undefined,
+                  completedAt: nextCompleted ? timestamp : undefined,
+                };
+              }),
             };
           }),
         }));
@@ -659,6 +843,8 @@ export const useStore = create<AppState>()(
       partialize: (state) => ({
         workOrders: state.workOrders,
         nextWorkOrderSequence: state.nextWorkOrderSequence,
+        permits: state.permits,
+        nextPermitSequence: state.nextPermitSequence,
       }),
     }
   )

@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout/Layout';
 import Dashboard from './pages/Dashboard';
 import WorkOrders from './pages/WorkOrders';
+import Permits from './pages/Permits';
 import Assets from './pages/Assets';
 import PMSchedules from './pages/PMSchedules';
 import Contractors from './pages/Contractors';
@@ -15,6 +16,7 @@ function App() {
       <Route path="/" element={<Layout />}>
         <Route index element={<Dashboard />} />
         <Route path="work-orders" element={<WorkOrders />} />
+        <Route path="permits" element={<Permits />} />
         <Route path="assets" element={<Assets />} />
         <Route path="pm-schedules" element={<PMSchedules />} />
         <Route path="contractors" element={<Contractors />} />
