@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, MouseEvent } from 'react';
 import {
   AppBar,
   Toolbar,
@@ -16,6 +16,11 @@ import {
   ListItemIcon,
   ListItemText,
   Tooltip,
+  Popover,
+  List,
+  ListItemButton,
+  Button,
+  Chip,
   useTheme,
 } from '@mui/material';
 import {
@@ -27,9 +32,10 @@ import {
   Person as PersonIcon,
   LocationOn as LocationIcon,
 } from '@mui/icons-material';
+import { formatDistanceToNow } from 'date-fns';
 import { useThemeContext } from '../../theme/ThemeContext';
 import { useStore } from '../../store/useStore';
-import { sites, alerts } from '../../data/mockData';
+import { sites } from '../../data/mockData';
 
 interface TopBarProps {
   onMenuClick: () => void;
@@ -38,11 +44,18 @@ interface TopBarProps {
 export default function TopBar({ onMenuClick }: TopBarProps) {
   const theme = useTheme();
   const { mode, toggleTheme } = useThemeContext();
-  const { selectedSiteId, setSelectedSiteId } = useStore();
+  const {
+    selectedSiteId,
+    setSelectedSiteId,
+    notifications,
+    markNotificationRead,
+    markAllNotificationsRead,
+  } = useStore();
+
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [notificationAnchor, setNotificationAnchor] = useState<null | HTMLElement>(null);
 
-  const handleProfileMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
+  const handleProfileMenuOpen = (event: MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);
   };
 
@@ -50,7 +63,7 @@ export default function TopBar({ onMenuClick }: TopBarProps) {
     setAnchorEl(null);
   };
 
-  const handleNotificationOpen = (event: React.MouseEvent<HTMLElement>) => {
+  const handleNotificationOpen = (event: MouseEvent<HTMLElement>) => {
     setNotificationAnchor(event.currentTarget);
   };
 
@@ -63,7 +76,7 @@ export default function TopBar({ onMenuClick }: TopBarProps) {
     setSelectedSiteId(value === 'all' ? null : value);
   };
 
-  const unreadAlerts = alerts.filter(a => a.severity === 'critical' || a.severity === 'warning').length;
+  const unreadNotifications = notifications.filter((notification) => !notification.read).length;
 
   return (
     <AppBar
@@ -86,7 +99,6 @@ export default function TopBar({ onMenuClick }: TopBarProps) {
             <MenuIcon />
           </IconButton>
 
-          {/* Site Selector */}
           <FormControl size="small" sx={{ minWidth: 200 }}>
             <Select
               value={selectedSiteId || 'all'}
@@ -103,7 +115,7 @@ export default function TopBar({ onMenuClick }: TopBarProps) {
                 <Box sx={{ display: 'flex', alignItems: 'center' }}>
                   <LocationIcon sx={{ mr: 1, fontSize: 20, color: 'primary.main' }} />
                   <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                    {selected === 'all' ? 'All Sites' : sites.find(s => s.id === selected)?.name}
+                    {selected === 'all' ? 'All Sites' : sites.find((site) => site.id === selected)?.name}
                   </Typography>
                 </Box>
               )}
@@ -128,23 +140,20 @@ export default function TopBar({ onMenuClick }: TopBarProps) {
         </Box>
 
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          {/* Theme Toggle */}
           <Tooltip title={mode === 'dark' ? 'Light mode' : 'Dark mode'}>
             <IconButton onClick={toggleTheme} sx={{ color: 'text.primary' }}>
               {mode === 'dark' ? <LightModeIcon /> : <DarkModeIcon />}
             </IconButton>
           </Tooltip>
 
-          {/* Notifications */}
           <Tooltip title="Notifications">
             <IconButton onClick={handleNotificationOpen} sx={{ color: 'text.primary' }}>
-              <Badge badgeContent={unreadAlerts} color="error">
+              <Badge badgeContent={unreadNotifications} color="error">
                 <NotificationsIcon />
               </Badge>
             </IconButton>
           </Tooltip>
 
-          {/* User Avatar */}
           <Tooltip title="Account">
             <IconButton onClick={handleProfileMenuOpen} sx={{ ml: 1 }}>
               <Avatar
@@ -162,7 +171,6 @@ export default function TopBar({ onMenuClick }: TopBarProps) {
           </Tooltip>
         </Box>
 
-        {/* Profile Menu */}
         <Menu
           anchorEl={anchorEl}
           open={Boolean(anchorEl)}
@@ -196,68 +204,72 @@ export default function TopBar({ onMenuClick }: TopBarProps) {
           </MenuItem>
         </Menu>
 
-        {/* Notifications Menu */}
-        <Menu
+        <Popover
           anchorEl={notificationAnchor}
           open={Boolean(notificationAnchor)}
           onClose={handleNotificationClose}
           transformOrigin={{ horizontal: 'right', vertical: 'top' }}
           anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
-          PaperProps={{
-            sx: { width: 360, maxHeight: 400, mt: 1 },
-          }}
         >
-          <Box sx={{ px: 2, py: 1.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-              Notifications
-            </Typography>
-            <Typography variant="caption" color="primary" sx={{ cursor: 'pointer' }}>
-              Mark all read
-            </Typography>
-          </Box>
-          <Divider />
-          {alerts.slice(0, 5).map((alert) => (
-            <MenuItem
-              key={alert.id}
-              onClick={handleNotificationClose}
-              sx={{
-                py: 1.5,
-                borderLeft: `3px solid ${
-                  alert.severity === 'critical'
-                    ? theme.palette.error.main
-                    : alert.severity === 'warning'
-                    ? theme.palette.warning.main
-                    : theme.palette.info.main
-                }`,
-                '&:hover': {
-                  backgroundColor: theme.palette.mode === 'dark'
-                    ? 'rgba(255, 255, 255, 0.05)'
-                    : 'rgba(0, 0, 0, 0.04)',
-                },
-              }}
-            >
-              <Box sx={{ width: '100%' }}>
-                <Typography variant="body2" sx={{ fontWeight: 500, mb: 0.5 }}>
-                  {alert.title}
+          <Box sx={{ width: 380, maxHeight: 460, display: 'flex', flexDirection: 'column' }}>
+            <Box sx={{ px: 2, py: 1.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                  Notifications
                 </Typography>
-                <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                  {alert.description.length > 60
-                    ? `${alert.description.substring(0, 60)}...`
-                    : alert.description}
-                </Typography>
+                <Chip size="small" color="error" label={`${unreadNotifications} unread`} />
               </Box>
-            </MenuItem>
-          ))}
-          <Divider />
-          <MenuItem
-            onClick={handleNotificationClose}
-            sx={{ justifyContent: 'center', py: 1.5 }}
-          >
-            <Typography variant="body2" color="primary" sx={{ fontWeight: 500 }}>
-              View All Notifications
-            </Typography>
-          </MenuItem>
-        </Menu>
+              <Button size="small" onClick={markAllNotificationsRead} disabled={unreadNotifications === 0}>
+                Mark all read
+              </Button>
+            </Box>
+            <Divider />
+            <List dense sx={{ p: 0, overflowY: 'auto' }}>
+              {notifications.map((notification) => (
+                <ListItemButton
+                  key={notification.id}
+                  onClick={() => markNotificationRead(notification.id)}
+                  sx={{
+                    py: 1.25,
+                    px: 2,
+                    borderLeft: `3px solid ${
+                      notification.severity === 'critical'
+                        ? theme.palette.error.main
+                        : notification.severity === 'warning'
+                        ? theme.palette.warning.main
+                        : theme.palette.info.main
+                    }`,
+                    backgroundColor: notification.read
+                      ? 'transparent'
+                      : theme.palette.mode === 'dark'
+                      ? 'rgba(255, 255, 255, 0.03)'
+                      : 'rgba(0, 0, 0, 0.02)',
+                    alignItems: 'flex-start',
+                  }}
+                >
+                  <Box sx={{ width: '100%' }}>
+                    <Typography variant="body2" sx={{ fontWeight: notification.read ? 500 : 700, mb: 0.5 }}>
+                      {notification.title}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
+                      {notification.message}
+                    </Typography>
+                    <Typography variant="caption" color="text.disabled">
+                      {formatDistanceToNow(new Date(notification.timestamp), { addSuffix: true })}
+                    </Typography>
+                  </Box>
+                </ListItemButton>
+              ))}
+              {notifications.length === 0 && (
+                <Box sx={{ py: 3, textAlign: 'center' }}>
+                  <Typography variant="body2" color="text.secondary">
+                    No notifications
+                  </Typography>
+                </Box>
+              )}
+            </List>
+          </Box>
+        </Popover>
       </Toolbar>
     </AppBar>
   );

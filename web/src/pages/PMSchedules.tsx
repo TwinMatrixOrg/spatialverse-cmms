@@ -1,10 +1,11 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, MouseEvent } from 'react';
 import {
   Box,
   Card,
   CardContent,
   Typography,
   Chip,
+  Button,
   TextField,
   InputAdornment,
   FormControl,
@@ -19,8 +20,6 @@ import {
   TableRow,
   Paper,
   IconButton,
-  Switch,
-  FormControlLabel,
   ToggleButton,
   ToggleButtonGroup,
   Grid2 as Grid,
@@ -29,6 +28,9 @@ import {
   ListItem,
   ListItemText,
   ListItemIcon,
+  Popover,
+  Snackbar,
+  Alert,
   useTheme,
   alpha,
 } from '@mui/material';
@@ -41,6 +43,8 @@ import {
   Close as CloseIcon,
   CheckCircle as CheckIcon,
   Circle as CircleIcon,
+  Checklist as ChecklistIcon,
+  AddTask as AddTaskIcon,
 } from '@mui/icons-material';
 import {
   format,
@@ -53,9 +57,18 @@ import {
   subMonths,
   getDay,
   isToday,
+  differenceInCalendarDays,
+  startOfDay,
 } from 'date-fns';
 import { useStore } from '../store/useStore';
-import { pmSchedules, getAssetById, getSiteById, getUserById, PMSchedule, PMFrequency } from '../data/mockData';
+import {
+  getAssetById,
+  getSiteById,
+  getUserById,
+  PMSchedule,
+  PMFrequency,
+  AssetType,
+} from '../data/mockData';
 
 const frequencyOptions: PMFrequency[] = [
   'daily',
@@ -68,20 +81,133 @@ const frequencyOptions: PMFrequency[] = [
 ];
 
 const statusColors = {
-  upcoming: '#FFA726',
+  upcoming: '#66BB6A',
   overdue: '#EF5350',
-  done: '#66BB6A',
+  done: '#29B6F6',
+};
+
+const dueStatusColors = {
+  upcoming: '#1E88E5',
+  dueToday: '#FB8C00',
+  overdue: '#E53935',
+  completed: '#43A047',
+};
+
+const checklistTemplates: Record<string, string[]> = {
+  HVAC: [
+    'Check refrigerant',
+    'Inspect filters (replace if needed)',
+    'Clean coils',
+    'Check electrical connections',
+    'Test thermostat',
+    'Log temperature readings',
+    'Check condensate drain',
+    'Inspect belts/bearings',
+  ],
+  Electrical: [
+    'Check panel connections',
+    'Test circuit breakers',
+    'Inspect wiring insulation',
+    'Check earthing',
+    'Test RCD/ELCB',
+    'Measure voltage/current',
+    'Check surge protectors',
+  ],
+  Plumbing: [
+    'Check for leaks',
+    'Test water pressure',
+    'Inspect pipe insulation',
+    'Check valves',
+    'Flush drains',
+    'Check water quality',
+  ],
+  'Fire Safety': [
+    'Test smoke detectors',
+    'Check fire extinguisher pressure',
+    'Inspect sprinkler heads',
+    'Check fire doors',
+    'Test alarm panel',
+    'Check emergency lighting',
+  ],
+  Elevator: [
+    'Check door operation',
+    'Inspect cables',
+    'Test emergency brake',
+    'Check lubrication',
+    'Test emergency phone',
+    'Check lighting',
+  ],
+  General: [
+    'Visual inspection',
+    'Check for damage',
+    'Clean equipment',
+    'Lubricate moving parts',
+    'Log condition',
+  ],
+};
+
+const getDueStatus = (pmSchedule: PMSchedule) => {
+  if (pmSchedule.status === 'done') {
+    return { key: 'completed', label: 'Completed', color: dueStatusColors.completed };
+  }
+
+  const daysUntilDue = differenceInCalendarDays(
+    startOfDay(new Date(pmSchedule.nextDueDate)),
+    startOfDay(new Date())
+  );
+
+  if (daysUntilDue < 0) {
+    return { key: 'overdue', label: 'Overdue', color: dueStatusColors.overdue };
+  }
+  if (daysUntilDue === 0) {
+    return { key: 'dueToday', label: 'Due Today', color: dueStatusColors.dueToday };
+  }
+
+  return { key: 'upcoming', label: 'Upcoming', color: dueStatusColors.upcoming };
+};
+
+const getDaysUntilDueMeta = (pmSchedule: PMSchedule) => {
+  const dueStatus = getDueStatus(pmSchedule);
+  if (dueStatus.key === 'completed') {
+    return { label: 'Completed', color: dueStatusColors.completed };
+  }
+
+  const daysUntilDue = differenceInCalendarDays(
+    startOfDay(new Date(pmSchedule.nextDueDate)),
+    startOfDay(new Date())
+  );
+
+  if (daysUntilDue < 0) {
+    return {
+      label: `${Math.abs(daysUntilDue)} day${Math.abs(daysUntilDue) === 1 ? '' : 's'} overdue`,
+      color: dueStatusColors.overdue,
+    };
+  }
+  if (daysUntilDue === 0) {
+    return { label: 'Due today', color: dueStatusColors.dueToday };
+  }
+
+  return {
+    label: `${daysUntilDue} day${daysUntilDue === 1 ? '' : 's'}`,
+    color: daysUntilDue <= 2 ? dueStatusColors.dueToday : dueStatusColors.upcoming,
+  };
 };
 
 export default function PMSchedules() {
   const theme = useTheme();
-  const { selectedSiteId } = useStore();
+  const { selectedSiteId, pmSchedules, generateWOFromPMSchedule } = useStore();
   const [viewMode, setViewMode] = useState<'calendar' | 'list'>('calendar');
   const [searchQuery, setSearchQuery] = useState('');
   const [frequencyFilter, setFrequencyFilter] = useState<PMFrequency | 'all'>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'upcoming' | 'overdue' | 'done'>('all');
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedPM, setSelectedPM] = useState<PMSchedule | null>(null);
+  const [selectedDayAnchor, setSelectedDayAnchor] = useState<HTMLElement | null>(null);
+  const [selectedDayDate, setSelectedDayDate] = useState<Date | null>(null);
+  const [selectedDayPMs, setSelectedDayPMs] = useState<PMSchedule[]>([]);
+  const [selectedChecklistType, setSelectedChecklistType] = useState<AssetType | null>(null);
+  const [checklistTitle, setChecklistTitle] = useState('');
+  const [snackbarMessage, setSnackbarMessage] = useState('');
 
   const filteredPMs = useMemo(() => {
     return pmSchedules.filter(pm => {
@@ -98,7 +224,26 @@ export default function PMSchedules() {
       }
       return true;
     });
-  }, [selectedSiteId, frequencyFilter, statusFilter, searchQuery]);
+  }, [pmSchedules, selectedSiteId, frequencyFilter, statusFilter, searchQuery]);
+
+  const handleDayClick = (event: MouseEvent<HTMLElement>, day: Date, daySchedules: PMSchedule[]) => {
+    setSelectedDayAnchor(event.currentTarget);
+    setSelectedDayDate(day);
+    setSelectedDayPMs(daySchedules);
+  };
+
+  const handleGenerateWO = (pmSchedule: PMSchedule) => {
+    const generatedWO = generateWOFromPMSchedule(pmSchedule);
+    const asset = getAssetById(pmSchedule.assetId);
+    setSnackbarMessage(`Work order ${generatedWO.number} created for ${asset?.name || pmSchedule.name}`);
+  };
+
+  const handleViewChecklist = (pmSchedule: PMSchedule) => {
+    const asset = getAssetById(pmSchedule.assetId);
+    const templateType = asset?.type === 'Structural' || asset?.type === 'IT/AV' ? 'General' : asset?.type;
+    setSelectedChecklistType((templateType || 'General') as AssetType);
+    setChecklistTitle(`${asset?.name || pmSchedule.name} — ${templateType || 'General'} Template`);
+  };
 
   // Calendar data
   const monthStart = startOfMonth(currentMonth);
@@ -239,58 +384,66 @@ export default function PMSchedules() {
                   return (
                     <Grid key={dateKey} size={{ xs: 12 / 7 }} sx={{ p: 0.5 }}>
                       <Box
+                        onClick={(event) => handleDayClick(event, day, dayPMs)}
                         sx={{
                           height: 100,
                           p: 1,
                           borderRadius: 1,
                           backgroundColor: today
-                            ? alpha(theme.palette.primary.main, 0.1)
+                            ? alpha('#14B8A6', 0.1)
                             : theme.palette.mode === 'dark'
                             ? alpha('#fff', 0.02)
                             : alpha('#000', 0.02),
-                          border: today ? `2px solid ${theme.palette.primary.main}` : 'none',
+                          border: today ? '2px solid #14B8A6' : `1px solid ${alpha(theme.palette.divider, 0.4)}`,
                           overflow: 'hidden',
+                          cursor: 'pointer',
                         }}
                       >
                         <Typography
                           variant="caption"
                           fontWeight={today ? 700 : 400}
-                          color={today ? 'primary.main' : 'text.secondary'}
+                          color={today ? '#0F766E' : 'text.secondary'}
                         >
                           {format(day, 'd')}
                         </Typography>
-                        <Box sx={{ mt: 0.5, overflow: 'auto', maxHeight: 72 }}>
-                          {dayPMs.slice(0, 3).map(pm => {
-                            const asset = getAssetById(pm.assetId);
-                            return (
-                              <Chip
-                                key={pm.id}
-                                size="small"
-                                label={asset?.name || pm.name}
-                                onClick={() => setSelectedPM(pm)}
-                                sx={{
-                                  mb: 0.5,
-                                  height: 20,
-                                  fontSize: '0.6rem',
-                                  width: '100%',
-                                  justifyContent: 'flex-start',
-                                  backgroundColor: alpha(statusColors[pm.status], 0.15),
-                                  color: statusColors[pm.status],
-                                  cursor: 'pointer',
-                                  '& .MuiChip-label': {
-                                    overflow: 'hidden',
-                                    textOverflow: 'ellipsis',
-                                    whiteSpace: 'nowrap',
-                                  },
-                                }}
-                              />
-                            );
-                          })}
-                          {dayPMs.length > 3 && (
+                        <Box sx={{ mt: 0.8, display: 'flex', flexWrap: 'wrap', gap: 0.5, alignItems: 'center' }}>
+                          {dayPMs.slice(0, 8).map(pm => (
+                            <Box
+                              key={pm.id}
+                              sx={{
+                                width: 9,
+                                height: 9,
+                                borderRadius: '50%',
+                                backgroundColor: statusColors[pm.status],
+                              }}
+                            />
+                          ))}
+                          {dayPMs.length > 8 && (
                             <Typography variant="caption" color="text.secondary">
-                              +{dayPMs.length - 3} more
+                              +{dayPMs.length - 8}
                             </Typography>
                           )}
+                        </Box>
+                        <Box sx={{ mt: 1, display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+                          {dayPMs.slice(0, 2).map(pm => (
+                            <Chip
+                              key={`${pm.id}-mini`}
+                              size="small"
+                              label={getAssetById(pm.assetId)?.name || pm.name}
+                              sx={{
+                                maxWidth: '100%',
+                                height: 18,
+                                fontSize: '0.58rem',
+                                backgroundColor: alpha(statusColors[pm.status], 0.12),
+                                color: statusColors[pm.status],
+                                '& .MuiChip-label': {
+                                  px: 0.6,
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                },
+                              }}
+                            />
+                          ))}
                         </Box>
                       </Box>
                     </Grid>
@@ -314,14 +467,18 @@ export default function PMSchedules() {
                 <TableCell>Last Done</TableCell>
                 <TableCell>Next Due</TableCell>
                 <TableCell>Status</TableCell>
-                <TableCell>Auto WO</TableCell>
+                <TableCell>Days Until Due</TableCell>
+                <TableCell>Checklist</TableCell>
+                <TableCell>Action</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {filteredPMs.map(pm => {
                 const asset = getAssetById(pm.assetId);
                 const site = getSiteById(pm.siteId);
-                const assignee = pm.assignedToId ? getUserById(pm.assignedToId) : null;
+                const dueStatus = getDueStatus(pm);
+                const dueMeta = getDaysUntilDueMeta(pm);
+                const canGenerateWO = dueStatus.key !== 'completed';
 
                 return (
                   <TableRow
@@ -355,16 +512,48 @@ export default function PMSchedules() {
                     <TableCell>
                       <Chip
                         size="small"
-                        label={pm.status}
+                        label={dueStatus.label}
                         sx={{
                           textTransform: 'capitalize',
-                          backgroundColor: alpha(statusColors[pm.status], 0.15),
-                          color: statusColors[pm.status],
+                          backgroundColor: alpha(dueStatus.color, 0.15),
+                          color: dueStatus.color,
                         }}
                       />
                     </TableCell>
                     <TableCell>
-                      <Switch checked={pm.autoCreateWO} size="small" />
+                      <Typography variant="body2" sx={{ color: dueMeta.color, fontWeight: 600 }}>
+                        {dueMeta.label}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        startIcon={<ChecklistIcon />}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          handleViewChecklist(pm);
+                        }}
+                      >
+                        View Checklist
+                      </Button>
+                    </TableCell>
+                    <TableCell>
+                      {canGenerateWO ? (
+                        <Button
+                          size="small"
+                          variant="contained"
+                          startIcon={<AddTaskIcon />}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            handleGenerateWO(pm);
+                          }}
+                        >
+                          Generate WO
+                        </Button>
+                      ) : (
+                        <Chip size="small" label="Complete" color="success" />
+                      )}
                     </TableCell>
                   </TableRow>
                 );
@@ -373,6 +562,53 @@ export default function PMSchedules() {
           </Table>
         </TableContainer>
       )}
+
+      <Popover
+        open={Boolean(selectedDayAnchor)}
+        anchorEl={selectedDayAnchor}
+        onClose={() => setSelectedDayAnchor(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+      >
+        <Box sx={{ p: 2, maxWidth: 360 }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
+            {selectedDayDate ? `PM Due on ${format(selectedDayDate, 'MMM d, yyyy')}` : 'PM Tasks'}
+          </Typography>
+          {selectedDayPMs.length === 0 ? (
+            <Typography variant="body2" color="text.secondary">
+              No PM tasks due on this day.
+            </Typography>
+          ) : (
+            <List dense sx={{ py: 0 }}>
+              {selectedDayPMs.map((pmSchedule) => {
+                const asset = getAssetById(pmSchedule.assetId);
+                return (
+                  <ListItem
+                    key={pmSchedule.id}
+                    onClick={() => {
+                      setSelectedPM(pmSchedule);
+                      setSelectedDayAnchor(null);
+                    }}
+                    sx={{
+                      px: 0,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <ListItemIcon sx={{ minWidth: 26 }}>
+                      <CircleIcon sx={{ fontSize: 10, color: statusColors[pmSchedule.status] }} />
+                    </ListItemIcon>
+                    <ListItemText
+                      primary={asset?.name || pmSchedule.name}
+                      secondary={pmSchedule.name}
+                      primaryTypographyProps={{ variant: 'body2', fontWeight: 600 }}
+                      secondaryTypographyProps={{ variant: 'caption' }}
+                    />
+                  </ListItem>
+                );
+              })}
+            </List>
+          )}
+        </Box>
+      </Popover>
 
       {/* PM Detail Drawer */}
       <Drawer
@@ -385,6 +621,68 @@ export default function PMSchedules() {
       >
         {selectedPM && <PMDetailPanel pm={selectedPM} onClose={() => setSelectedPM(null)} />}
       </Drawer>
+
+      <Drawer
+        anchor="right"
+        open={Boolean(selectedChecklistType)}
+        onClose={() => setSelectedChecklistType(null)}
+        PaperProps={{
+          sx: { width: { xs: '100%', sm: 420 } },
+        }}
+      >
+        <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+          <Box
+            sx={{
+              p: 2,
+              borderBottom: '1px solid',
+              borderColor: 'divider',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+            }}
+          >
+            <Box>
+              <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                PPM Checklist Template
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {checklistTitle}
+              </Typography>
+            </Box>
+            <IconButton onClick={() => setSelectedChecklistType(null)}>
+              <CloseIcon />
+            </IconButton>
+          </Box>
+          <Box sx={{ p: 2, flex: 1, overflow: 'auto' }}>
+            <List dense sx={{ py: 0 }}>
+              {(checklistTemplates[selectedChecklistType || 'General'] || checklistTemplates.General).map(
+                (item, index) => (
+                  <ListItem key={`${item}-${index}`} sx={{ px: 0 }}>
+                    <ListItemIcon sx={{ minWidth: 28 }}>
+                      <CheckIcon sx={{ fontSize: 18, color: 'success.main' }} />
+                    </ListItemIcon>
+                    <ListItemText
+                      primary={item}
+                      primaryTypographyProps={{ variant: 'body2' }}
+                    />
+                  </ListItem>
+                )
+              )}
+            </List>
+          </Box>
+        </Box>
+      </Drawer>
+
+      <Snackbar
+        open={Boolean(snackbarMessage)}
+        autoHideDuration={3000}
+        onClose={() => setSnackbarMessage('')}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert onClose={() => setSnackbarMessage('')} severity="success" variant="filled">
+          {snackbarMessage}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

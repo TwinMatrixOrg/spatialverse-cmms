@@ -7,27 +7,6 @@ export type AssetHealthStatus = 'critical' | 'warning' | 'good';
 export type PMFrequency = 'daily' | 'weekly' | 'bi-weekly' | 'monthly' | 'quarterly' | 'semi-annual' | 'annual';
 export type PMStatus = 'upcoming' | 'overdue' | 'done';
 
-export interface WorkOrderChecklistItem {
-  id: string;
-  text: string;
-  completed: boolean;
-}
-
-export interface WorkOrderTimelineEntry {
-  id: string;
-  type: string;
-  description: string;
-  userId: string;
-  createdAt: string;
-}
-
-export interface WorkOrderComment {
-  id: string;
-  userId: string;
-  message: string;
-  createdAt: string;
-}
-
 export interface Site {
   id: string;
   name: string;
@@ -77,17 +56,14 @@ export interface WorkOrder {
   priority: Priority;
   status: WorkOrderStatus;
   assignedToId?: string;
-  reportedById?: string;
   contractorId?: string;
-  estimatedHours?: number;
   slaDeadline: string;
   createdAt: string;
   updatedAt: string;
   resolvedAt?: string;
   closedAt?: string;
-  checklist?: WorkOrderChecklistItem[];
-  timeline?: WorkOrderTimelineEntry[];
-  comments?: WorkOrderComment[];
+  checklist?: { id: string; text: string; completed: boolean }[];
+  timeline?: { id: string; type: string; description: string; userId: string; createdAt: string }[];
 }
 
 export interface Contractor {
@@ -146,6 +122,16 @@ export interface Alert {
   createdAt: string;
 }
 
+export interface AppNotification {
+  id: string;
+  type: 'work_order' | 'pm' | 'inventory' | 'contractor';
+  title: string;
+  message: string;
+  timestamp: string;
+  read: boolean;
+  severity: 'critical' | 'warning' | 'info';
+}
+
 // Sites - Malaysian Malls
 export const sites: Site[] = [
   {
@@ -181,61 +167,6 @@ export const users: User[] = [
   { id: 'user-6', email: 'raj@twinmatrix.com', firstName: 'Raj', lastName: 'Krishnan', role: 'technician', siteIds: ['site-1', 'site-3'] },
   { id: 'user-7', email: 'mei@twinmatrix.com', firstName: 'Mei', lastName: 'Ling', role: 'technician', siteIds: ['site-2', 'site-3'] },
   { id: 'user-8', email: 'zain@twinmatrix.com', firstName: 'Zain', lastName: 'Hassan', role: 'technician', siteIds: ['site-1'] },
-];
-
-export const technicians = users.filter((user) => user.role === 'technician');
-
-export const workOrderFaultTypes = [
-  'Mechanical',
-  'Electrical',
-  'Plumbing',
-  'Fire Safety',
-  'HVAC',
-  'IT/AV',
-  'Structural',
-  'Other',
-] as const;
-
-export const prioritySLAHours: Record<Priority, number> = {
-  P1: 4,
-  P2: 8,
-  P3: 24,
-  P4: 72,
-};
-
-export const workOrderStatusLabels: Record<WorkOrderStatus, string> = {
-  open: 'Open',
-  assigned: 'Assigned',
-  in_progress: 'In Progress',
-  pending_parts: 'Pending Parts',
-  resolved: 'Resolved',
-  closed: 'Closed',
-};
-
-export const nextStatusMap: Record<WorkOrderStatus, WorkOrderStatus[]> = {
-  open: ['assigned', 'in_progress', 'resolved'],
-  assigned: ['in_progress', 'pending_parts', 'resolved'],
-  in_progress: ['pending_parts', 'resolved'],
-  pending_parts: ['assigned', 'in_progress', 'resolved'],
-  resolved: ['closed'],
-  closed: [],
-};
-
-const checklistTemplatesByType: Record<string, string[]> = {
-  HVAC: ['Check refrigerant levels', 'Inspect filters', 'Test airflow', 'Check electrical connections', 'Log readings'],
-  Mechanical: ['Inspect moving components', 'Verify alignment', 'Check lubrication points', 'Tighten mounting hardware', 'Log vibration readings'],
-  Electrical: ['Lockout/tagout verification', 'Inspect breakers and relays', 'Check insulation resistance', 'Test voltage under load', 'Record measurements'],
-  Plumbing: ['Check for visible leaks', 'Inspect valves and joints', 'Verify pressure levels', 'Flush and clean strainers', 'Log flow readings'],
-  'Fire Safety': ['Check alarm panel status', 'Inspect detectors', 'Test audible/visual alarms', 'Verify pump pressure', 'Document compliance checklist'],
-  'IT/AV': ['Check network connectivity', 'Inspect cable terminations', 'Validate device firmware', 'Run system diagnostics', 'Capture incident notes'],
-  Structural: ['Inspect visible cracks', 'Check anchor points', 'Assess corrosion areas', 'Verify load-bearing condition', 'Photograph and log findings'],
-  Other: ['Visual inspection', 'Functional check', 'Safety verification', 'Rectification action', 'Complete service notes'],
-};
-
-const defaultCommentTemplates = [
-  { userId: 'user-2', message: 'Initial assessment completed. Monitoring for updates.' },
-  { userId: 'user-5', message: 'Technician acknowledged and preparing required tools.' },
-  { userId: 'user-3', message: 'Site operations notified. Access coordinated.' },
 ];
 
 // Helper to generate dates
@@ -643,23 +574,53 @@ export const alerts: Alert[] = [
   { id: 'alert-10', type: 'license_expiry', severity: 'warning', title: 'License Expiring Soon', description: 'VerticalMove Elevator Services license expires in 45 days', relatedEntityId: 'contractor-3', relatedEntityType: 'contractor', createdAt: subDays(5) },
 ];
 
-export const getChecklistTemplate = (faultType: string, assetType?: AssetType): WorkOrderChecklistItem[] => {
-  const template = checklistTemplatesByType[faultType] || (assetType ? checklistTemplatesByType[assetType] : undefined) || checklistTemplatesByType.Other;
-  return template.map((text, index) => ({
-    id: `cl-${faultType.toLowerCase().replace(/\s+/g, '-')}-${index + 1}`,
-    text,
-    completed: false,
-  }));
-};
-
-export const getDefaultWorkOrderComments = (workOrderId: string): WorkOrderComment[] => {
-  return defaultCommentTemplates.map((template, index) => ({
-    id: `cm-${workOrderId}-${index + 1}`,
-    userId: template.userId,
-    message: template.message,
-    createdAt: subDays(0.9 - index * 0.15),
-  }));
-};
+export const notifications: AppNotification[] = [
+  {
+    id: 'notif-1',
+    type: 'work_order',
+    title: 'P1 WO #WO-003: AHU-B2 Compressor Failure — SLA breach in 45 minutes',
+    message: 'Immediate escalation required to avoid SLA violation.',
+    timestamp: subDays(0.03),
+    read: false,
+    severity: 'critical',
+  },
+  {
+    id: 'notif-2',
+    type: 'pm',
+    title: 'PM Overdue: Pavilion KL — Fire Suppression System (14 days overdue)',
+    message: 'Preventive maintenance task is overdue and requires scheduling.',
+    timestamp: subDays(0.2),
+    read: false,
+    severity: 'warning',
+  },
+  {
+    id: 'notif-3',
+    type: 'work_order',
+    title: 'WO #WO-012 resolved by Ahmad Rizal — awaiting verification',
+    message: 'Please review and verify closure details.',
+    timestamp: subDays(0.45),
+    read: false,
+    severity: 'info',
+  },
+  {
+    id: 'notif-4',
+    type: 'inventory',
+    title: 'Low stock alert: HVAC Filter 25x25 (3 units remaining, reorder at 10)',
+    message: 'Inventory threshold breached for critical HVAC consumable.',
+    timestamp: subDays(0.75),
+    read: false,
+    severity: 'warning',
+  },
+  {
+    id: 'notif-5',
+    type: 'contractor',
+    title: 'Contractor license expiring: CoolTech Services — in 12 days',
+    message: 'Renewal follow-up required to maintain compliance.',
+    timestamp: subDays(1.2),
+    read: false,
+    severity: 'warning',
+  },
+];
 
 // Helper functions
 export const getAssetById = (id: string) => assets.find(a => a.id === id);
@@ -673,11 +634,66 @@ export const getPMSchedulesByAsset = (assetId: string) => pmSchedules.filter(pm 
 export const getInventoryBySite = (siteId: string) => inventoryItems.filter(i => i.siteId === siteId);
 export const getLowStockItems = () => inventoryItems.filter(i => i.quantityOnHand < i.minimumStock);
 
+export const calculateAssetHealth = (
+  assetId: string,
+  sourceWorkOrders: WorkOrder[] = workOrders,
+  sourcePMSchedules: PMSchedule[] = pmSchedules
+) => {
+  const isOpenWorkOrder = (status: WorkOrderStatus) => !['resolved', 'closed'].includes(status);
+  const nowDate = new Date();
+  let score = 100;
+
+  const assetOpenWOs = sourceWorkOrders.filter(
+    (workOrder) => workOrder.assetId === assetId && isOpenWorkOrder(workOrder.status)
+  );
+
+  assetOpenWOs.forEach((workOrder) => {
+    if (workOrder.priority === 'P1' || workOrder.priority === 'P2') {
+      score -= 15;
+    } else if (workOrder.priority === 'P3') {
+      score -= 8;
+    } else {
+      score -= 3;
+    }
+  });
+
+  const assetPMs = sourcePMSchedules.filter((pmSchedule) => pmSchedule.assetId === assetId);
+  const overdueDays = assetPMs
+    .filter((pmSchedule) => pmSchedule.status !== 'done')
+    .map((pmSchedule) => Math.floor((nowDate.getTime() - new Date(pmSchedule.nextDueDate).getTime()) / (1000 * 60 * 60 * 24)))
+    .filter((days) => days > 0);
+
+  const maxOverdueDays = overdueDays.length ? Math.max(...overdueDays) : 0;
+  if (maxOverdueDays > 30) {
+    score -= 20;
+  } else if (maxOverdueDays >= 7) {
+    score -= 10;
+  }
+
+  const lastCompletedPM = assetPMs
+    .filter((pmSchedule) => pmSchedule.lastDoneDate)
+    .sort((a, b) => new Date(b.lastDoneDate || 0).getTime() - new Date(a.lastDoneDate || 0).getTime())[0];
+
+  if (
+    lastCompletedPM?.lastDoneDate &&
+    new Date(lastCompletedPM.lastDoneDate).getTime() <= new Date(lastCompletedPM.nextDueDate).getTime()
+  ) {
+    score += 5;
+  }
+
+  return Math.max(0, Math.min(100, score));
+};
+
 // Dashboard KPIs calculation
-export const getDashboardKPIs = (siteId?: string) => {
-  const filteredWOs = siteId ? workOrders.filter(wo => wo.siteId === siteId) : workOrders;
-  const filteredAssets = siteId ? assets.filter(a => a.siteId === siteId) : assets;
-  const filteredPMs = siteId ? pmSchedules.filter(pm => pm.siteId === siteId) : pmSchedules;
+export const getDashboardKPIs = (
+  siteId?: string,
+  sourceWorkOrders: WorkOrder[] = workOrders,
+  sourceAssets: Asset[] = assets,
+  sourcePMSchedules: PMSchedule[] = pmSchedules
+) => {
+  const filteredWOs = siteId ? sourceWorkOrders.filter(wo => wo.siteId === siteId) : sourceWorkOrders;
+  const filteredAssets = siteId ? sourceAssets.filter(a => a.siteId === siteId) : sourceAssets;
+  const filteredPMs = siteId ? sourcePMSchedules.filter(pm => pm.siteId === siteId) : sourcePMSchedules;
 
   const openWOs = filteredWOs.filter(wo => ['open', 'assigned', 'in_progress', 'pending_parts'].includes(wo.status)).length;
   const overdueWOs = filteredWOs.filter(wo => {
@@ -714,8 +730,11 @@ export const getDashboardKPIs = (siteId?: string) => {
   };
 };
 
-export const getWorkOrdersByStatusCount = (siteId?: string) => {
-  const filteredWOs = siteId ? workOrders.filter(wo => wo.siteId === siteId) : workOrders;
+export const getWorkOrdersByStatusCount = (
+  siteId?: string,
+  sourceWorkOrders: WorkOrder[] = workOrders
+) => {
+  const filteredWOs = siteId ? sourceWorkOrders.filter(wo => wo.siteId === siteId) : sourceWorkOrders;
   return {
     open: filteredWOs.filter(wo => wo.status === 'open').length,
     assigned: filteredWOs.filter(wo => wo.status === 'assigned').length,
