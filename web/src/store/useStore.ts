@@ -2,6 +2,12 @@ import { addHours } from 'date-fns';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import {
+  Asset,
+  AssetSensors,
+  SensorStatus,
+  SensorType,
+  ThresholdRule,
+  assets as seedAssets,
   getUserById,
   getAssetById,
   getChecklistTemplate,
@@ -27,6 +33,7 @@ import {
   RootCause,
   pmSchedules as initialPMSchedules,
   notifications as initialNotifications,
+  thresholdRulesSeed,
   WorkOrderLabourEntry,
   WorkOrderPartUsedEntry,
 } from '../data/mockData';
@@ -121,6 +128,13 @@ interface AppState {
   pmSchedules: PMSchedule[];
   notifications: AppNotification[];
   checkAndEscalateSlaBreaches: () => void;
+  monitoredAssets: Asset[];
+  thresholdRules: ThresholdRule[];
+  acknowledgedAlerts: string[];
+  addThresholdRule: (rule: Omit<ThresholdRule, 'id'>) => void;
+  toggleThresholdRule: (ruleId: string) => void;
+  acknowledgeAlert: (alertId: string) => void;
+  updateSensorReadings: () => void;
   assetHealthBandFilter: AssetHealthBand;
   setAssetHealthBandFilter: (band: AssetHealthBand) => void;
   generateWOFromPMSchedule: (pmSchedule: PMSchedule) => WorkOrder;
@@ -138,6 +152,132 @@ const calculateLabourCost = (entries: WorkOrderLabourEntry[]) =>
 
 const calculatePartsCost = (entries: WorkOrderPartUsedEntry[]) =>
   entries.reduce((sum, entry) => sum + entry.quantity * entry.unitCost, 0);
+
+const monitoredSensorOrder: SensorType[] = ['temperature', 'humidity', 'vibration', 'powerDraw', 'pressure'];
+
+const sensorPrecision: Record<SensorType, number> = {
+  temperature: 1,
+  humidity: 0,
+  vibration: 2,
+  powerDraw: 2,
+  pressure: 2,
+};
+
+const clampSensorValue = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
+
+const roundSensorValue = (sensorType: SensorType, value: number) =>
+  Number(value.toFixed(sensorPrecision[sensorType]));
+
+const cloneSensorState = (sensors?: AssetSensors): AssetSensors | undefined => {
+  if (!sensors) {
+    return undefined;
+  }
+
+  return monitoredSensorOrder.reduce<AssetSensors>((accumulator, sensorType) => {
+    const sensor = sensors[sensorType];
+    if (!sensor) {
+      return accumulator;
+    }
+
+    return {
+      ...accumulator,
+      [sensorType]: {
+        ...sensor,
+        threshold: { ...sensor.threshold },
+      },
+    };
+  }, {});
+};
+
+const cloneAssetSensorData = (asset: Asset): Asset => ({
+  ...asset,
+  sensors: cloneSensorState(asset.sensors),
+  sensorHistory: (asset.sensorHistory || []).map((point) => ({
+    ...point,
+    readings: { ...point.readings },
+  })),
+});
+
+const deriveSensorStatus = (sensors?: AssetSensors): SensorStatus => {
+  if (!sensors) {
+    return 'normal';
+  }
+
+  let status: SensorStatus = 'normal';
+
+  monitoredSensorOrder.forEach((sensorType) => {
+    const sensor = sensors[sensorType];
+    if (!sensor) {
+      return;
+    }
+
+    if (sensor.value >= sensor.threshold.critical) {
+      status = 'critical';
+      return;
+    }
+
+    if (sensor.value >= sensor.threshold.warning && status !== 'critical') {
+      status = 'warning';
+    }
+  });
+
+  return status;
+};
+
+const refreshAssetSensors = (asset: Asset): Asset => {
+  if (!asset.sensors) {
+    return asset;
+  }
+
+  const timestamp = new Date().toISOString();
+  const nextSensors = monitoredSensorOrder.reduce<AssetSensors>((accumulator, sensorType) => {
+    const sensor = asset.sensors?.[sensorType];
+    if (!sensor) {
+      return accumulator;
+    }
+
+    const randomStep = 1 + (Math.random() * 0.04 - 0.02);
+    const nextValue = roundSensorValue(
+      sensorType,
+      clampSensorValue(sensor.value * randomStep, sensor.min, sensor.max)
+    );
+
+    return {
+      ...accumulator,
+      [sensorType]: {
+        ...sensor,
+        value: nextValue,
+      },
+    };
+  }, {});
+
+  const nextReading = monitoredSensorOrder.reduce<Record<string, number>>((accumulator, sensorType) => {
+    const sensor = nextSensors[sensorType];
+    if (!sensor) {
+      return accumulator;
+    }
+
+    return {
+      ...accumulator,
+      [sensorType]: sensor.value,
+    };
+  }, {});
+
+  const nextHistory = [
+    ...(asset.sensorHistory || []),
+    {
+      timestamp,
+      readings: nextReading,
+    },
+  ].slice(-24);
+
+  return {
+    ...asset,
+    sensors: nextSensors,
+    sensorHistory: nextHistory,
+    sensorStatus: deriveSensorStatus(nextSensors),
+  };
+};
 
 const normalizeWorkOrderCosts = (workOrder: WorkOrder): WorkOrder => {
   const labourEntries = workOrder.labourEntries || [];
@@ -294,6 +434,9 @@ export const useStore = create<AppState>()(
       nextPermitSequence: initialPermitSequence,
       pmSchedules: initialPMSchedules,
       notifications: initialNotifications,
+      monitoredAssets: seedAssets.map((asset) => cloneAssetSensorData(asset)),
+      thresholdRules: thresholdRulesSeed.map((rule) => ({ ...rule })),
+      acknowledgedAlerts: [],
       checkAndEscalateSlaBreaches: () => {
         const timestamp = new Date().toISOString();
         const activeStatuses: WorkOrderStatus[] = ['open', 'assigned', 'in_progress', 'pending_parts'];
@@ -324,6 +467,41 @@ export const useStore = create<AppState>()(
               ],
             };
           }),
+        }));
+      },
+      addThresholdRule: (rule) => {
+        set((state) => ({
+          thresholdRules: [
+            {
+              ...rule,
+              id: `rule-${Date.now()}`,
+            },
+            ...state.thresholdRules,
+          ],
+        }));
+      },
+      toggleThresholdRule: (ruleId) => {
+        set((state) => ({
+          thresholdRules: state.thresholdRules.map((rule) =>
+            rule.id === ruleId
+              ? {
+                  ...rule,
+                  enabled: !rule.enabled,
+                }
+              : rule
+          ),
+        }));
+      },
+      acknowledgeAlert: (alertId) => {
+        set((state) => ({
+          acknowledgedAlerts: state.acknowledgedAlerts.includes(alertId)
+            ? state.acknowledgedAlerts
+            : [...state.acknowledgedAlerts, alertId],
+        }));
+      },
+      updateSensorReadings: () => {
+        set((state) => ({
+          monitoredAssets: state.monitoredAssets.map((asset) => refreshAssetSensors(asset)),
         }));
       },
       assetHealthBandFilter: 'all',
@@ -927,6 +1105,9 @@ export const useStore = create<AppState>()(
         nextWorkOrderSequence: state.nextWorkOrderSequence,
         permits: state.permits,
         nextPermitSequence: state.nextPermitSequence,
+        monitoredAssets: state.monitoredAssets,
+        thresholdRules: state.thresholdRules,
+        acknowledgedAlerts: state.acknowledgedAlerts,
       }),
     }
   )

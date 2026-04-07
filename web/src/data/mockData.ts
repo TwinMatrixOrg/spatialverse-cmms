@@ -6,6 +6,9 @@ export type WorkOrderApprovalStatus = 'not_required' | 'pending_supervisor' | 'p
 export type WorkOrderApprovalRole = 'Supervisor' | 'FM Manager';
 export type AssetType = 'HVAC' | 'Electrical' | 'Plumbing' | 'Fire Safety' | 'Elevator' | 'Structural' | 'IT/AV' | 'General';
 export type AssetHealthStatus = 'critical' | 'warning' | 'good';
+export type SensorType = 'temperature' | 'humidity' | 'vibration' | 'powerDraw' | 'pressure';
+export type SensorStatus = 'normal' | 'warning' | 'critical';
+export type SensorUnit = '°C' | '%' | 'mm/s' | 'kW' | 'bar';
 export type PMFrequency = 'daily' | 'weekly' | 'bi-weekly' | 'monthly' | 'quarterly' | 'semi-annual' | 'annual';
 export type PMStatus = 'upcoming' | 'overdue' | 'done';
 export type PermitType = 'hot_work' | 'confined_space' | 'electrical_isolation' | 'working_at_height' | 'general';
@@ -104,6 +107,32 @@ export interface User {
   siteIds: string[];
 }
 
+export interface SensorThreshold {
+  warning: number;
+  critical: number;
+}
+
+export interface SensorReading {
+  value: number;
+  unit: SensorUnit;
+  threshold: SensorThreshold;
+  min: number;
+  max: number;
+}
+
+export interface AssetSensors {
+  temperature?: SensorReading;
+  humidity?: SensorReading;
+  vibration?: SensorReading;
+  powerDraw?: SensorReading;
+  pressure?: SensorReading;
+}
+
+export interface SensorHistoryPoint {
+  timestamp: string;
+  readings: Record<string, number>;
+}
+
 export interface Asset {
   id: string;
   name: string;
@@ -124,6 +153,9 @@ export interface Asset {
   openWorkOrdersCount: number;
   failureHistory?: AssetFailureEvent[];
   mtbfDays?: number;
+  sensors?: AssetSensors;
+  sensorHistory?: SensorHistoryPoint[];
+  sensorStatus?: SensorStatus;
 }
 
 export interface WorkOrder {
@@ -217,6 +249,18 @@ export interface Alert {
   relatedEntityId?: string;
   relatedEntityType?: 'work_order' | 'asset' | 'contractor' | 'inventory' | 'pm_schedule';
   createdAt: string;
+}
+
+export interface ThresholdRule {
+  id: string;
+  name: string;
+  description?: string;
+  assetType: AssetType | 'all';
+  sensorType: SensorType;
+  warning: number;
+  critical: number;
+  enabled: boolean;
+  autoCreateWorkOrder: boolean;
 }
 
 export interface AppNotification {
@@ -374,8 +418,172 @@ const addHours = (h: number) => new Date(now.getTime() + h * 60 * 60 * 1000).toI
 const addDays = (d: number) => new Date(now.getTime() + d * 24 * 60 * 60 * 1000).toISOString();
 const subDays = (d: number) => new Date(now.getTime() - d * 24 * 60 * 60 * 1000).toISOString();
 
+const sensorTypeOrder: SensorType[] = ['temperature', 'humidity', 'vibration', 'powerDraw', 'pressure'];
+
+const sensorConfigs: Record<SensorType, Omit<SensorReading, 'value'>> = {
+  temperature: {
+    unit: '°C',
+    threshold: { warning: 32, critical: 38 },
+    min: 12,
+    max: 60,
+  },
+  humidity: {
+    unit: '%',
+    threshold: { warning: 68, critical: 80 },
+    min: 25,
+    max: 95,
+  },
+  vibration: {
+    unit: 'mm/s',
+    threshold: { warning: 4.5, critical: 6.2 },
+    min: 0.2,
+    max: 12,
+  },
+  powerDraw: {
+    unit: 'kW',
+    threshold: { warning: 64, critical: 82 },
+    min: 3,
+    max: 140,
+  },
+  pressure: {
+    unit: 'bar',
+    threshold: { warning: 6.2, critical: 7.8 },
+    min: 0.5,
+    max: 12,
+  },
+};
+
+const sensorsByAssetType: Record<AssetType, SensorType[]> = {
+  HVAC: ['temperature', 'vibration', 'powerDraw'],
+  Elevator: ['vibration', 'temperature'],
+  Electrical: ['powerDraw', 'temperature'],
+  Plumbing: ['pressure', 'temperature'],
+  'Fire Safety': ['pressure'],
+  Structural: ['temperature', 'humidity'],
+  'IT/AV': ['temperature', 'humidity'],
+  General: ['temperature', 'humidity'],
+};
+
+const clampSensor = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
+
+const sensorPrecision: Record<SensorType, number> = {
+  temperature: 1,
+  humidity: 0,
+  vibration: 2,
+  powerDraw: 2,
+  pressure: 2,
+};
+
+const roundSensorValue = (sensorType: SensorType, value: number) =>
+  Number(value.toFixed(sensorPrecision[sensorType]));
+
+const seedFromString = (value: string) => {
+  let hash = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (hash << 5) - hash + value.charCodeAt(index);
+    hash |= 0;
+  }
+
+  return Math.abs(hash);
+};
+
+const deterministicNoise = (seed: number) => {
+  const raw = Math.sin(seed * 12.9898) * 43758.5453;
+  return raw - Math.floor(raw);
+};
+
+const calculateSensorStatus = (sensors: AssetSensors): SensorStatus => {
+  let status: SensorStatus = 'normal';
+
+  sensorTypeOrder.forEach((sensorType) => {
+    const sensor = sensors[sensorType];
+    if (!sensor) {
+      return;
+    }
+
+    if (sensor.value >= sensor.threshold.critical) {
+      status = 'critical';
+      return;
+    }
+
+    if (sensor.value >= sensor.threshold.warning && status !== 'critical') {
+      status = 'warning';
+    }
+  });
+
+  return status;
+};
+
+const createSensorReading = (
+  asset: Pick<Asset, 'id' | 'healthStatus'>,
+  sensorType: SensorType,
+  sequence: number
+): SensorReading => {
+  const config = sensorConfigs[sensorType];
+  const noiseSeed = seedFromString(`${asset.id}-${sensorType}-${sequence}`);
+  const stateFactor: Record<AssetHealthStatus, number> = {
+    good: 0.7,
+    warning: 0.9,
+    critical: 1.03,
+  };
+
+  const jitter = (deterministicNoise(noiseSeed) - 0.5) * 0.12;
+  let rawValue = config.threshold.warning * (stateFactor[asset.healthStatus] + jitter);
+
+  if (asset.healthStatus === 'critical') {
+    rawValue = Math.max(rawValue, config.threshold.critical * (1 + deterministicNoise(noiseSeed + 11) * 0.06));
+  }
+
+  const value = roundSensorValue(sensorType, clampSensor(rawValue, config.min, config.max));
+
+  return {
+    value,
+    unit: config.unit,
+    threshold: { ...config.threshold },
+    min: config.min,
+    max: config.max,
+  };
+};
+
+const createSensorsForAsset = (asset: Pick<Asset, 'id' | 'type' | 'healthStatus'>): AssetSensors => {
+  const configuredSensors = sensorsByAssetType[asset.type] || ['temperature'];
+
+  return configuredSensors.reduce<AssetSensors>((accumulator, sensorType, index) => {
+    return {
+      ...accumulator,
+      [sensorType]: createSensorReading(asset, sensorType, index),
+    };
+  }, {});
+};
+
+const createSensorHistory = (assetId: string, sensors: AssetSensors): SensorHistoryPoint[] => {
+  const nowTime = Date.now();
+
+  return Array.from({ length: 24 }, (_, index) => {
+    const hoursAgo = 23 - index;
+    const timestamp = new Date(nowTime - hoursAgo * 60 * 60 * 1000).toISOString();
+    const readings: Record<string, number> = {};
+
+    sensorTypeOrder.forEach((sensorType) => {
+      const sensor = sensors[sensorType];
+      if (!sensor) {
+        return;
+      }
+
+      const baseSeed = seedFromString(`${assetId}-${sensorType}`);
+      const drift = Math.sin((index + baseSeed % 9) / 3.6) * sensor.value * 0.02;
+      const randomNoise = (deterministicNoise(baseSeed + index * 17) - 0.5) * sensor.value * 0.03;
+      const slowTrend = (index - 12) * sensor.value * 0.0015;
+      const nextValue = clampSensor(sensor.value + drift + randomNoise + slowTrend, sensor.min, sensor.max);
+      readings[sensorType] = roundSensorValue(sensorType, nextValue);
+    });
+
+    return { timestamp, readings };
+  });
+};
+
 // Assets - 50+ across all sites
-export const assets: Asset[] = [
+const baseAssets: Asset[] = [
   // Pavilion KL - HVAC
   { id: 'asset-1', name: 'AHU-PKL-01', type: 'HVAC', siteId: 'site-1', location: { lat: 3.1490, lng: 101.7133 }, floor: 'B2', zone: 'Zone A', description: 'Main Air Handling Unit - Level B2', manufacturer: 'Daikin', model: 'AHU-5000', serialNumber: 'DK2021-001', healthScore: 92, healthStatus: 'good', lastServiceDate: subDays(15), openWorkOrdersCount: 0 },
   {
@@ -643,6 +851,33 @@ export const assets: Asset[] = [
   },
   { id: 'asset-55', name: 'Smoke-Exhaust-PKL', type: 'Fire Safety', siteId: 'site-1', location: { lat: 3.1489, lng: 101.7128 }, floor: 'All', zone: 'Central Shaft', description: 'Smoke Extraction System', manufacturer: 'Systemair', model: 'AXC', serialNumber: 'SY2019-001', healthScore: 91, healthStatus: 'good', lastServiceDate: subDays(8), openWorkOrdersCount: 0 },
 ];
+
+export const assets: Asset[] = baseAssets.map((asset) => {
+  const sensors = createSensorsForAsset(asset);
+  const sensorHistory = createSensorHistory(asset.id, sensors);
+  const latestReadings = sensorHistory[sensorHistory.length - 1]?.readings || {};
+  const sensorsWithLatestValues = sensorTypeOrder.reduce<AssetSensors>((accumulator, sensorType) => {
+    const currentSensor = sensors[sensorType];
+    if (!currentSensor) {
+      return accumulator;
+    }
+
+    return {
+      ...accumulator,
+      [sensorType]: {
+        ...currentSensor,
+        value: latestReadings[sensorType] ?? currentSensor.value,
+      },
+    };
+  }, {});
+
+  return {
+    ...asset,
+    sensors: sensorsWithLatestValues,
+    sensorHistory,
+    sensorStatus: calculateSensorStatus(sensorsWithLatestValues),
+  };
+});
 
 // Work Orders
 const createApprovalChain = (chain?: WorkOrderApprovalStep[]): WorkOrderApprovalStep[] => {
@@ -1340,6 +1575,27 @@ export const alerts: Alert[] = [
   { id: 'alert-8', type: 'license_expiry', severity: 'critical', title: 'License Expired', description: 'Arctic Air Conditioning license expired 15 days ago', relatedEntityId: 'contractor-9', relatedEntityType: 'contractor', createdAt: subDays(0.1) },
   { id: 'alert-9', type: 'license_expiry', severity: 'warning', title: 'License Expiring Soon', description: 'BuildStrong Structural insurance expires in 30 days', relatedEntityId: 'contractor-6', relatedEntityType: 'contractor', createdAt: subDays(2) },
   { id: 'alert-10', type: 'license_expiry', severity: 'warning', title: 'License Expiring Soon', description: 'VerticalMove Elevator Services license expires in 45 days', relatedEntityId: 'contractor-3', relatedEntityType: 'contractor', createdAt: subDays(5) },
+];
+
+export const thresholdRulesSeed: ThresholdRule[] = [
+  { id: 'rule-1', name: 'HVAC Temperature Watch', assetType: 'HVAC', sensorType: 'temperature', warning: 30, critical: 36, enabled: true, autoCreateWorkOrder: true },
+  { id: 'rule-2', name: 'HVAC Vibration Escalation', assetType: 'HVAC', sensorType: 'vibration', warning: 4.2, critical: 5.8, enabled: true, autoCreateWorkOrder: true },
+  { id: 'rule-3', name: 'HVAC Power Draw Spike', assetType: 'HVAC', sensorType: 'powerDraw', warning: 60, critical: 78, enabled: true, autoCreateWorkOrder: true },
+  { id: 'rule-4', name: 'Elevator Ride Comfort', assetType: 'Elevator', sensorType: 'vibration', warning: 3.8, critical: 5.2, enabled: true, autoCreateWorkOrder: true },
+  { id: 'rule-5', name: 'Elevator Motor Heat', assetType: 'Elevator', sensorType: 'temperature', warning: 42, critical: 50, enabled: true, autoCreateWorkOrder: true },
+  { id: 'rule-6', name: 'Electrical Panel Load', assetType: 'Electrical', sensorType: 'powerDraw', warning: 72, critical: 94, enabled: true, autoCreateWorkOrder: true },
+  { id: 'rule-7', name: 'Electrical Thermal Stress', assetType: 'Electrical', sensorType: 'temperature', warning: 45, critical: 54, enabled: true, autoCreateWorkOrder: true },
+  { id: 'rule-8', name: 'Plumbing Pump Pressure', assetType: 'Plumbing', sensorType: 'pressure', warning: 6.8, critical: 8.6, enabled: true, autoCreateWorkOrder: true },
+  { id: 'rule-9', name: 'Plumbing Room Heat', assetType: 'Plumbing', sensorType: 'temperature', warning: 37, critical: 44, enabled: true, autoCreateWorkOrder: false },
+  { id: 'rule-10', name: 'Fire Line Pressure', assetType: 'Fire Safety', sensorType: 'pressure', warning: 6.2, critical: 7.6, enabled: true, autoCreateWorkOrder: true },
+  { id: 'rule-11', name: 'IT Rack Temperature', assetType: 'IT/AV', sensorType: 'temperature', warning: 28, critical: 35, enabled: true, autoCreateWorkOrder: false },
+  { id: 'rule-12', name: 'Data Room Humidity', assetType: 'IT/AV', sensorType: 'humidity', warning: 65, critical: 78, enabled: true, autoCreateWorkOrder: false },
+  { id: 'rule-13', name: 'Structural Moisture Alert', assetType: 'Structural', sensorType: 'humidity', warning: 72, critical: 84, enabled: false, autoCreateWorkOrder: false },
+  { id: 'rule-14', name: 'General Thermal Baseline', assetType: 'General', sensorType: 'temperature', warning: 33, critical: 40, enabled: true, autoCreateWorkOrder: false },
+  { id: 'rule-15', name: 'General Humidity Baseline', assetType: 'General', sensorType: 'humidity', warning: 70, critical: 82, enabled: false, autoCreateWorkOrder: false },
+  { id: 'rule-16', name: 'Portfolio Vibration Watch', assetType: 'all', sensorType: 'vibration', warning: 4.8, critical: 6.6, enabled: true, autoCreateWorkOrder: true },
+  { id: 'rule-17', name: 'Portfolio Pressure Integrity', assetType: 'all', sensorType: 'pressure', warning: 6.9, critical: 8.9, enabled: false, autoCreateWorkOrder: true },
+  { id: 'rule-18', name: 'Portfolio Power Governance', assetType: 'all', sensorType: 'powerDraw', warning: 82, critical: 102, enabled: false, autoCreateWorkOrder: false },
 ];
 
 export const notifications: AppNotification[] = [
