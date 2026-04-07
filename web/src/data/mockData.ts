@@ -2,10 +2,22 @@
 
 export type Priority = 'P1' | 'P2' | 'P3' | 'P4';
 export type WorkOrderStatus = 'open' | 'assigned' | 'in_progress' | 'pending_parts' | 'resolved' | 'closed';
+export type WorkOrderApprovalStatus = 'not_required' | 'pending_supervisor' | 'pending_manager' | 'approved' | 'rejected';
+export type WorkOrderApprovalRole = 'Supervisor' | 'FM Manager';
 export type AssetType = 'HVAC' | 'Electrical' | 'Plumbing' | 'Fire Safety' | 'Elevator' | 'Structural' | 'IT/AV' | 'General';
 export type AssetHealthStatus = 'critical' | 'warning' | 'good';
 export type PMFrequency = 'daily' | 'weekly' | 'bi-weekly' | 'monthly' | 'quarterly' | 'semi-annual' | 'annual';
 export type PMStatus = 'upcoming' | 'overdue' | 'done';
+
+export interface WorkOrderApprovalStep {
+  level: 1 | 2;
+  role: WorkOrderApprovalRole;
+  approverId?: string;
+  approverName?: string;
+  action?: 'approved' | 'rejected';
+  comment?: string;
+  timestamp?: string;
+}
 
 export interface WorkOrderChecklistItem {
   id: string;
@@ -88,6 +100,8 @@ export interface WorkOrder {
   checklist?: WorkOrderChecklistItem[];
   timeline?: WorkOrderTimelineEntry[];
   comments?: WorkOrderComment[];
+  approvalStatus?: WorkOrderApprovalStatus;
+  approvalChain?: WorkOrderApprovalStep[];
 }
 
 export interface Contractor {
@@ -349,7 +363,79 @@ export const assets: Asset[] = [
 ];
 
 // Work Orders
-export const workOrders: WorkOrder[] = [
+const createApprovalChain = (chain?: WorkOrderApprovalStep[]): WorkOrderApprovalStep[] => {
+  const source =
+    chain ||
+    [
+      { level: 1 as const, role: 'Supervisor' as const },
+      { level: 2 as const, role: 'FM Manager' as const },
+    ];
+
+  return source.map((step) => ({ ...step }));
+};
+
+const seededApprovalStates: Record<string, { approvalStatus: WorkOrderApprovalStatus; approvalChain: WorkOrderApprovalStep[] }> = {
+  'wo-1': {
+    approvalStatus: 'pending_supervisor',
+    approvalChain: createApprovalChain(),
+  },
+  'wo-2': {
+    approvalStatus: 'pending_supervisor',
+    approvalChain: createApprovalChain(),
+  },
+  'wo-3': {
+    approvalStatus: 'pending_supervisor',
+    approvalChain: createApprovalChain(),
+  },
+  'wo-4': {
+    approvalStatus: 'pending_supervisor',
+    approvalChain: createApprovalChain(),
+  },
+  'wo-5': {
+    approvalStatus: 'pending_supervisor',
+    approvalChain: createApprovalChain(),
+  },
+  'wo-6': {
+    approvalStatus: 'rejected',
+    approvalChain: createApprovalChain([
+      {
+        level: 1,
+        role: 'Supervisor',
+        approverId: 'user-3',
+        approverName: 'Kumar Suresh',
+        action: 'rejected',
+        comment: 'Insufficient fault details. Please attach supporting diagnostics.',
+        timestamp: subDays(0.7),
+      },
+      { level: 2, role: 'FM Manager' },
+    ]),
+  },
+  'wo-7': {
+    approvalStatus: 'rejected',
+    approvalChain: createApprovalChain([
+      {
+        level: 1,
+        role: 'Supervisor',
+        approverId: 'user-2',
+        approverName: 'Lee Wei Ming',
+        action: 'approved',
+        comment: 'Supervisor approved for manager review.',
+        timestamp: subDays(1.8),
+      },
+      {
+        level: 2,
+        role: 'FM Manager',
+        approverId: 'user-4',
+        approverName: 'Fatimah Abdullah',
+        action: 'rejected',
+        comment: 'Budget hold this week. Re-submit next cycle.',
+        timestamp: subDays(1.6),
+      },
+    ]),
+  },
+};
+
+const rawWorkOrders: Omit<WorkOrder, 'approvalStatus' | 'approvalChain'>[] = [
   // Open Work Orders
   {
     id: 'wo-1', number: 'WO-2024-00001', siteId: 'site-1', assetId: 'asset-2', title: 'AHU-PKL-02 Making Unusual Noise', description: 'Reported unusual grinding noise from AHU-PKL-02. Possible bearing failure.', faultType: 'Mechanical Failure', priority: 'P1', status: 'open', slaDeadline: addHours(4), createdAt: subDays(0.1), updatedAt: subDays(0.1),
@@ -509,6 +595,16 @@ export const workOrders: WorkOrder[] = [
   { id: 'wo-31', number: 'WO-2024-00031', siteId: 'site-1', assetId: 'asset-6', title: 'Generator Monthly Run', description: 'Monthly generator run and inspection.', faultType: 'Preventive Maintenance', priority: 'P4', status: 'closed', assignedToId: 'user-8', slaDeadline: addDays(3), createdAt: subDays(20), updatedAt: subDays(18), resolvedAt: subDays(18.5), closedAt: subDays(18) },
   { id: 'wo-32', number: 'WO-2024-00032', siteId: 'site-2', assetId: 'asset-28', title: 'Sprinkler System Inspection', description: 'Annual sprinkler inspection and certification.', faultType: 'Annual Inspection', priority: 'P2', status: 'closed', assignedToId: 'user-7', contractorId: 'contractor-5', slaDeadline: addDays(5), createdAt: subDays(14), updatedAt: subDays(12), resolvedAt: subDays(12.5), closedAt: subDays(12) },
 ];
+
+export const workOrders: WorkOrder[] = rawWorkOrders.map((workOrder) => {
+  const seededApproval = seededApprovalStates[workOrder.id];
+
+  return {
+    ...workOrder,
+    approvalStatus: seededApproval?.approvalStatus || 'not_required',
+    approvalChain: createApprovalChain(seededApproval?.approvalChain),
+  };
+});
 
 // Contractors
 export const contractors: Contractor[] = [
