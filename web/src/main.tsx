@@ -8,7 +8,7 @@ import './index.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <BrowserRouter basename="/cmms">
+    <BrowserRouter basename={import.meta.env.VITE_BASENAME ?? '/cmms'}>
       <ThemeContextProvider>
         <CssBaseline />
         <App />

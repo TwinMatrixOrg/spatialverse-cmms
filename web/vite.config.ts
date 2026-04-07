@@ -7,6 +7,16 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: false,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+          'vendor-mui': ['@mui/material', '@mui/icons-material', '@emotion/react', '@emotion/styled'],
+          'vendor-map': ['maplibre-gl'],
+          'vendor-charts': ['recharts'],
+        },
+      },
+    },
   },
   server: {
     port: 5173,
