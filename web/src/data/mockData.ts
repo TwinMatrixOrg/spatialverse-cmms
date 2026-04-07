@@ -6,6 +6,10 @@ export type AssetType = 'HVAC' | 'Electrical' | 'Plumbing' | 'Fire Safety' | 'El
 export type AssetHealthStatus = 'critical' | 'warning' | 'good';
 export type PMFrequency = 'daily' | 'weekly' | 'bi-weekly' | 'monthly' | 'quarterly' | 'semi-annual' | 'annual';
 export type PMStatus = 'upcoming' | 'overdue' | 'done';
+export type PermitType = 'hot_work' | 'confined_space' | 'electrical_isolation' | 'working_at_height' | 'general';
+export type PermitStatus = 'draft' | 'issued' | 'active' | 'closed' | 'cancelled';
+export type PermitRiskLevel = 'low' | 'medium' | 'high';
+export type PermitChecklistPhase = 'pre' | 'during' | 'post';
 
 export interface WorkOrderChecklistItem {
   id: string;
@@ -156,6 +160,31 @@ export interface AppNotification {
   severity: 'critical' | 'warning' | 'info';
 }
 
+export interface PermitSafetyChecklistItem {
+  id: string;
+  phase: PermitChecklistPhase;
+  item: string;
+  completed: boolean;
+  completedBy?: string;
+  completedAt?: string;
+}
+
+export interface Permit {
+  id: string;
+  workOrderId: string;
+  permitNumber: string;
+  type: PermitType;
+  status: PermitStatus;
+  issuedById: string;
+  issuedByName: string;
+  validFrom: string;
+  validTo: string;
+  location: string;
+  riskLevel: PermitRiskLevel;
+  precautions: string[];
+  safetyChecklist: PermitSafetyChecklistItem[];
+}
+
 // Sites - Malaysian Malls
 export const sites: Site[] = [
   {
@@ -220,6 +249,28 @@ export const workOrderStatusLabels: Record<WorkOrderStatus, string> = {
   pending_parts: 'Pending Parts',
   resolved: 'Resolved',
   closed: 'Closed',
+};
+
+export const permitTypeLabels: Record<PermitType, string> = {
+  hot_work: 'Hot Work',
+  confined_space: 'Confined Space',
+  electrical_isolation: 'Electrical Isolation',
+  working_at_height: 'Working at Height',
+  general: 'General',
+};
+
+export const permitStatusLabels: Record<PermitStatus, string> = {
+  draft: 'Draft',
+  issued: 'Issued',
+  active: 'Active',
+  closed: 'Closed',
+  cancelled: 'Cancelled',
+};
+
+export const permitRiskLabels: Record<PermitRiskLevel, string> = {
+  low: 'Low',
+  medium: 'Medium',
+  high: 'High',
 };
 
 export const nextStatusMap: Record<WorkOrderStatus, WorkOrderStatus[]> = {
@@ -698,6 +749,177 @@ export const notifications: AppNotification[] = [
     timestamp: subDays(1.2),
     read: false,
     severity: 'warning',
+  },
+];
+
+const permitChecklistTemplate: Record<PermitChecklistPhase, string[]> = {
+  pre: ['Review JSA and work scope', 'Confirm PPE and emergency equipment'],
+  during: ['Maintain barricade and signage', 'Monitor hazards and gas/energy readings'],
+  post: ['Restore area and remove temporary controls', 'Complete permit handover and closeout briefing'],
+};
+
+const createPermitChecklist = (
+  permitId: string,
+  completedIds: string[] = [],
+  completedById = 'user-5'
+): PermitSafetyChecklistItem[] => {
+  return (Object.entries(permitChecklistTemplate) as [PermitChecklistPhase, string[]][]).flatMap(
+    ([phase, items]) =>
+      items.map((item, index) => {
+        const checklistId = `${permitId}-${phase}-${index + 1}`;
+        const completed = completedIds.includes(checklistId);
+
+        return {
+          id: checklistId,
+          phase,
+          item,
+          completed,
+          completedBy: completed ? completedById : undefined,
+          completedAt: completed ? subDays(0.3 - index * 0.02) : undefined,
+        };
+      })
+  );
+};
+
+export const permits: Permit[] = [
+  {
+    id: 'permit-1',
+    workOrderId: 'wo-2',
+    permitNumber: 'PTW-2026-0001',
+    type: 'electrical_isolation',
+    status: 'active',
+    issuedById: 'user-2',
+    issuedByName: 'Lee Wei Ming',
+    validFrom: subDays(0.15),
+    validTo: addHours(10),
+    location: 'B3 • Electrical Room • MDB-MV-02',
+    riskLevel: 'high',
+    precautions: ['Apply LOTO on incoming feeder and downstream panel', 'Use CAT III insulated tools and arc-rated PPE', 'Assign standby person during energized testing'],
+    safetyChecklist: createPermitChecklist('permit-1', ['permit-1-pre-1', 'permit-1-pre-2', 'permit-1-during-1'], 'user-6'),
+  },
+  {
+    id: 'permit-2',
+    workOrderId: 'wo-3',
+    permitNumber: 'PTW-2026-0002',
+    type: 'hot_work',
+    status: 'issued',
+    issuedById: 'user-3',
+    issuedByName: 'Kumar Suresh',
+    validFrom: subDays(0.1),
+    validTo: addHours(12),
+    location: 'B3 • Chiller Plant Room',
+    riskLevel: 'medium',
+    precautions: ['Remove combustibles within 10m radius', 'Station fire extinguisher and fire watch', 'Verify ventilation before brazing'],
+    safetyChecklist: createPermitChecklist('permit-2', ['permit-2-pre-1'], 'user-7'),
+  },
+  {
+    id: 'permit-3',
+    workOrderId: 'wo-5',
+    permitNumber: 'PTW-2026-0003',
+    type: 'working_at_height',
+    status: 'draft',
+    issuedById: 'user-4',
+    issuedByName: 'Fatimah Abdullah',
+    validFrom: addHours(2),
+    validTo: addHours(14),
+    location: 'L4 • Cargo Lift Shaft Access',
+    riskLevel: 'high',
+    precautions: ['Inspect anchor points and full-body harness', 'Deploy exclusion zone below work area', 'Keep rescue kit and trained rescuer on standby'],
+    safetyChecklist: createPermitChecklist('permit-3'),
+  },
+  {
+    id: 'permit-4',
+    workOrderId: 'wo-7',
+    permitNumber: 'PTW-2026-0004',
+    type: 'confined_space',
+    status: 'active',
+    issuedById: 'user-2',
+    issuedByName: 'Lee Wei Ming',
+    validFrom: subDays(0.3),
+    validTo: addHours(6),
+    location: 'B3 • Chiller Sump Access Hatch',
+    riskLevel: 'high',
+    precautions: ['Continuous gas monitor required at entry point', 'Entry attendant must remain outside space', 'Use intrinsically safe lighting only'],
+    safetyChecklist: createPermitChecklist('permit-4', ['permit-4-pre-1', 'permit-4-pre-2', 'permit-4-during-1', 'permit-4-during-2'], 'user-5'),
+  },
+  {
+    id: 'permit-5',
+    workOrderId: 'wo-8',
+    permitNumber: 'PTW-2026-0005',
+    type: 'electrical_isolation',
+    status: 'closed',
+    issuedById: 'user-2',
+    issuedByName: 'Lee Wei Ming',
+    validFrom: subDays(1.2),
+    validTo: subDays(0.7),
+    location: 'Main Lobby Lift Control Panel',
+    riskLevel: 'medium',
+    precautions: ['Isolate lift controller and verify zero voltage', 'Barricade lift landing doors on affected floors', 'Perform test run with emergency stop validation'],
+    safetyChecklist: createPermitChecklist(
+      'permit-5',
+      ['permit-5-pre-1', 'permit-5-pre-2', 'permit-5-during-1', 'permit-5-during-2', 'permit-5-post-1', 'permit-5-post-2'],
+      'user-8'
+    ),
+  },
+  {
+    id: 'permit-6',
+    workOrderId: 'wo-10',
+    permitNumber: 'PTW-2026-0006',
+    type: 'general',
+    status: 'issued',
+    issuedById: 'user-2',
+    issuedByName: 'Lee Wei Ming',
+    validFrom: subDays(0.4),
+    validTo: addHours(18),
+    location: 'B3 • Pump Room',
+    riskLevel: 'low',
+    precautions: ['Use drip trays and absorbent pads for seal work', 'Maintain housekeeping to avoid slip hazards', 'Confirm isolation valves are tagged'],
+    safetyChecklist: createPermitChecklist('permit-6', ['permit-6-pre-1', 'permit-6-pre-2'], 'user-6'),
+  },
+  {
+    id: 'permit-7',
+    workOrderId: 'wo-19',
+    permitNumber: 'PTW-2026-0007',
+    type: 'hot_work',
+    status: 'active',
+    issuedById: 'user-2',
+    issuedByName: 'Lee Wei Ming',
+    validFrom: subDays(0.09),
+    validTo: addHours(5),
+    location: 'B2 • AHU Service Corridor',
+    riskLevel: 'high',
+    precautions: ['Coordinate temporary fire detection bypass with security', 'Use spark containment blankets around motor mount', 'Conduct 60-minute post-work fire watch'],
+    safetyChecklist: createPermitChecklist('permit-7', ['permit-7-pre-1', 'permit-7-during-1'], 'user-5'),
+  },
+  {
+    id: 'permit-8',
+    workOrderId: 'wo-21',
+    permitNumber: 'PTW-2026-0008',
+    type: 'electrical_isolation',
+    status: 'cancelled',
+    issuedById: 'user-4',
+    issuedByName: 'Fatimah Abdullah',
+    validFrom: subDays(0.2),
+    validTo: addHours(4),
+    location: 'B3 • Electrical Room South',
+    riskLevel: 'high',
+    precautions: ['Verify replacement breaker rating and trip curve', 'Confirm temporary load transfer plan before shutdown', 'Escalate abnormal heat readings to duty engineer'],
+    safetyChecklist: createPermitChecklist('permit-8', ['permit-8-pre-1'], 'user-6'),
+  },
+  {
+    id: 'permit-9',
+    workOrderId: 'wo-24',
+    permitNumber: 'PTW-2026-0009',
+    type: 'confined_space',
+    status: 'draft',
+    issuedById: 'user-3',
+    issuedByName: 'Kumar Suresh',
+    validFrom: addHours(1),
+    validTo: addHours(9),
+    location: 'B2 • STP Access Chamber',
+    riskLevel: 'high',
+    precautions: ['Verify H2S detector calibration before entry', 'Ensure forced ventilation runs continuously', 'Use full body harness with lifeline'],
+    safetyChecklist: createPermitChecklist('permit-9'),
   },
 ];
 

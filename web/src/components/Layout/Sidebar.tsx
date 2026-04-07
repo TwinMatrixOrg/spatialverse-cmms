@@ -15,6 +15,7 @@ import {
 import {
   Dashboard as DashboardIcon,
   Assignment as WorkOrderIcon,
+  AssignmentLate as PermitIcon,
   Inventory2 as AssetIcon,
   EventNote as PMIcon,
   Engineering as ContractorIcon,
@@ -35,6 +36,7 @@ interface SidebarProps {
 const menuItems = [
   { text: 'Dashboard', icon: <DashboardIcon />, path: '/' },
   { text: 'Work Orders', icon: <WorkOrderIcon />, path: '/work-orders' },
+  { text: 'Permits', icon: <PermitIcon />, path: '/permits' },
   { text: 'Assets', icon: <AssetIcon />, path: '/assets' },
   { text: 'PM Schedules', icon: <PMIcon />, path: '/pm-schedules' },
   { text: 'Contractors', icon: <ContractorIcon />, path: '/contractors' },
