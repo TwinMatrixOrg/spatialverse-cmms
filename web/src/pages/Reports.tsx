@@ -34,7 +34,8 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { subDays } from 'date-fns';
-import { workOrders, assets, contractors, pmSchedules, getAssetById } from '../data/mockData';
+import { contractors, pmSchedules, getAssetById, sites } from '../data/mockData';
+import { useStore } from '../store/useStore';
 
 const woTrendData = [
   { date: 'Mon', created: 12, completed: 8 },
@@ -99,11 +100,71 @@ const formatDateForInput = (date: Date): string => {
   return `${year}-${month}-${day}`;
 };
 
+const formatRM = (value: number) =>
+  `RM ${value.toLocaleString('en-MY', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+
 export default function Reports() {
   const theme = useTheme();
   const [activeTab, setActiveTab] = useState(0);
   const [startDate, setStartDate] = useState<string>(formatDateForInput(subDays(new Date(), 30)));
   const [endDate, setEndDate] = useState<string>(formatDateForInput(new Date()));
+  const workOrders = useStore((state) => state.workOrders);
+
+  const rangeStart = new Date(startDate);
+  rangeStart.setHours(0, 0, 0, 0);
+  const rangeEnd = new Date(endDate);
+  rangeEnd.setHours(23, 59, 59, 999);
+
+  const isWithinRange = (dateString: string) => {
+    const entryDate = new Date(dateString);
+    return entryDate >= rangeStart && entryDate <= rangeEnd;
+  };
+
+  const getWorkOrderCostInRange = (workOrder: (typeof workOrders)[number]) => {
+    const labourCost = (workOrder.labourEntries || [])
+      .filter((entry) => isWithinRange(entry.date))
+      .reduce((sum, entry) => sum + entry.hours * entry.ratePerHour, 0);
+    const partsCost = (workOrder.partsUsed || [])
+      .filter((entry) => isWithinRange(entry.date))
+      .reduce((sum, entry) => sum + entry.quantity * entry.unitCost, 0);
+    return labourCost + partsCost;
+  };
+
+  const costPerSite = sites
+    .map((site) => {
+      const totalCost = workOrders
+        .filter((workOrder) => workOrder.siteId === site.id)
+        .reduce((sum, workOrder) => sum + getWorkOrderCostInRange(workOrder), 0);
+
+      return {
+        site: site.name,
+        totalCost: Number(totalCost.toFixed(2)),
+      };
+    })
+    .filter((siteCost) => siteCost.totalCost > 0)
+    .sort((a, b) => b.totalCost - a.totalCost);
+
+  const topCostAssets = Array.from(
+    workOrders.reduce<Map<string, number>>((accumulator, workOrder) => {
+      const cost = getWorkOrderCostInRange(workOrder);
+      if (cost <= 0) {
+        return accumulator;
+      }
+
+      const previous = accumulator.get(workOrder.assetId) || 0;
+      accumulator.set(workOrder.assetId, previous + cost);
+      return accumulator;
+    }, new Map())
+  )
+    .map(([assetId, totalCost]) => ({
+      asset: getAssetById(assetId)?.name || assetId,
+      totalCost: Number(totalCost.toFixed(2)),
+    }))
+    .sort((a, b) => b.totalCost - a.totalCost)
+    .slice(0, 5);
 
   // Calculate real metrics from mock data
   const totalWOs = workOrders.length;
@@ -319,6 +380,62 @@ export default function Reports() {
                         <Tooltip />
                         <Legend />
                       </PieChart>
+                    </ResponsiveContainer>
+                  </Box>
+                </CardContent>
+              </Card>
+            </Grid>
+
+            <Grid size={{ xs: 12 }}>
+              <Typography variant="h6" sx={{ fontWeight: 700, mt: 1 }}>
+                Cost Analysis
+              </Typography>
+            </Grid>
+
+            <Grid size={{ xs: 12, lg: 6 }}>
+              <Card>
+                <CardContent>
+                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
+                    Cost per Site
+                  </Typography>
+                  <Box sx={{ height: 320 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={costPerSite} layout="vertical" margin={{ top: 8, right: 12, left: 8, bottom: 8 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />
+                        <XAxis
+                          type="number"
+                          stroke={theme.palette.text.secondary}
+                          tickFormatter={(value: number) => `RM ${value.toLocaleString('en-MY')}`}
+                        />
+                        <YAxis dataKey="site" type="category" width={120} stroke={theme.palette.text.secondary} />
+                        <Tooltip formatter={(value: number) => [formatRM(value), 'Cost']} />
+                        <Bar dataKey="totalCost" fill={theme.palette.primary.main} radius={[0, 6, 6, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </Box>
+                </CardContent>
+              </Card>
+            </Grid>
+
+            <Grid size={{ xs: 12, lg: 6 }}>
+              <Card>
+                <CardContent>
+                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
+                    Top 5 Most Expensive Assets
+                  </Typography>
+                  <Box sx={{ height: 320 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={topCostAssets} layout="vertical" margin={{ top: 8, right: 12, left: 8, bottom: 8 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />
+                        <XAxis
+                          type="number"
+                          stroke={theme.palette.text.secondary}
+                          tickFormatter={(value: number) => `RM ${value.toLocaleString('en-MY')}`}
+                        />
+                        <YAxis dataKey="asset" type="category" width={140} stroke={theme.palette.text.secondary} />
+                        <Tooltip formatter={(value: number) => [formatRM(value), 'Cost']} />
+                        <Bar dataKey="totalCost" fill={theme.palette.error.main} radius={[0, 6, 6, 0]} />
+                      </BarChart>
                     </ResponsiveContainer>
                   </Box>
                 </CardContent>

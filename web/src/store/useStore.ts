@@ -18,6 +18,8 @@ import {
   AppNotification,
   pmSchedules as initialPMSchedules,
   notifications as initialNotifications,
+  WorkOrderLabourEntry,
+  WorkOrderPartUsedEntry,
 } from '../data/mockData';
 
 interface CreateWorkOrderInput {
@@ -37,6 +39,23 @@ interface UpdateWorkOrderStatusInput {
   comment?: string;
 }
 
+interface AddLabourEntryInput {
+  technicianId: string;
+  technicianName: string;
+  hours: number;
+  ratePerHour: number;
+  date?: string;
+  description?: string;
+}
+
+interface AddPartsEntryInput {
+  inventoryItemId: string;
+  itemName: string;
+  quantity: number;
+  unitCost: number;
+  date?: string;
+}
+
 export type AssetHealthBand = 'all' | 'critical' | 'at_risk' | 'healthy';
 
 interface AppState {
@@ -52,6 +71,8 @@ interface AppState {
   updateWorkOrderStatus: (input: UpdateWorkOrderStatusInput) => void;
   toggleChecklistItem: (workOrderId: string, checklistItemId: string) => void;
   addWorkOrderComment: (workOrderId: string, message: string, userId?: string) => void;
+  addLabourEntry: (workOrderId: string, entry: AddLabourEntryInput) => void;
+  addPartsEntry: (workOrderId: string, entry: AddPartsEntryInput) => void;
   pmSchedules: PMSchedule[];
   notifications: AppNotification[];
   assetHealthBandFilter: AssetHealthBand;
@@ -66,11 +87,42 @@ const extractSequence = (number: string) => {
   return match ? Number.parseInt(match[1], 10) : 0;
 };
 
+const calculateLabourCost = (entries: WorkOrderLabourEntry[]) =>
+  entries.reduce((sum, entry) => sum + entry.hours * entry.ratePerHour, 0);
+
+const calculatePartsCost = (entries: WorkOrderPartUsedEntry[]) =>
+  entries.reduce((sum, entry) => sum + entry.quantity * entry.unitCost, 0);
+
+const normalizeWorkOrderCosts = (workOrder: WorkOrder): WorkOrder => {
+  const labourEntries = workOrder.labourEntries || [];
+  const partsUsed = workOrder.partsUsed || [];
+  const totalLabourCost =
+    Number.isFinite(workOrder.totalLabourCost) && workOrder.totalLabourCost > 0
+      ? workOrder.totalLabourCost
+      : calculateLabourCost(labourEntries);
+  const totalPartsCost =
+    Number.isFinite(workOrder.totalPartsCost) && workOrder.totalPartsCost > 0
+      ? workOrder.totalPartsCost
+      : calculatePartsCost(partsUsed);
+
+  return {
+    ...workOrder,
+    labourEntries,
+    partsUsed,
+    totalLabourCost,
+    totalPartsCost,
+    totalCost:
+      Number.isFinite(workOrder.totalCost) && workOrder.totalCost > 0
+        ? workOrder.totalCost
+        : totalLabourCost + totalPartsCost,
+  };
+};
+
 const hydratedWorkOrders = seedWorkOrders.map((workOrder) => {
   const asset = getAssetById(workOrder.assetId);
   const reportedById = workOrder.reportedById || 'user-2';
 
-  return {
+  return normalizeWorkOrderCosts({
     ...workOrder,
     reportedById,
     checklist:
@@ -93,7 +145,7 @@ const hydratedWorkOrders = seedWorkOrders.map((workOrder) => {
       workOrder.comments && workOrder.comments.length > 0
         ? workOrder.comments
         : getDefaultWorkOrderComments(workOrder.id),
-  };
+  });
 });
 
 const initialSequence =
@@ -174,6 +226,11 @@ export const useStore = create<AppState>()(
               createdAt,
             },
           ],
+          labourEntries: [],
+          partsUsed: [],
+          totalLabourCost: 0,
+          totalPartsCost: 0,
+          totalCost: 0,
         };
 
         set((state) => ({
@@ -282,6 +339,89 @@ export const useStore = create<AppState>()(
           }),
         }));
       },
+      addLabourEntry: (workOrderId, entry) => {
+        if (entry.hours <= 0 || entry.ratePerHour <= 0) {
+          return;
+        }
+
+        const entryDate = entry.date || new Date().toISOString();
+        const nowIso = new Date().toISOString();
+
+        set((state) => ({
+          workOrders: state.workOrders.map((workOrder) => {
+            if (workOrder.id !== workOrderId) {
+              return workOrder;
+            }
+
+            const currentLabourEntries = workOrder.labourEntries || [];
+            const currentPartsEntries = workOrder.partsUsed || [];
+            const labourEntries = [
+              ...currentLabourEntries,
+              {
+                id: `lab-${workOrder.id}-${Date.now()}`,
+                technicianId: entry.technicianId,
+                technicianName: entry.technicianName,
+                hours: entry.hours,
+                ratePerHour: entry.ratePerHour,
+                date: entryDate,
+                description: entry.description,
+              },
+            ];
+            const totalLabourCost = calculateLabourCost(labourEntries);
+            const totalPartsCost = calculatePartsCost(currentPartsEntries);
+
+            return {
+              ...workOrder,
+              updatedAt: nowIso,
+              labourEntries,
+              totalLabourCost,
+              totalPartsCost,
+              totalCost: totalLabourCost + totalPartsCost,
+            };
+          }),
+        }));
+      },
+      addPartsEntry: (workOrderId, entry) => {
+        if (entry.quantity <= 0 || entry.unitCost <= 0) {
+          return;
+        }
+
+        const entryDate = entry.date || new Date().toISOString();
+        const nowIso = new Date().toISOString();
+
+        set((state) => ({
+          workOrders: state.workOrders.map((workOrder) => {
+            if (workOrder.id !== workOrderId) {
+              return workOrder;
+            }
+
+            const currentLabourEntries = workOrder.labourEntries || [];
+            const currentPartsEntries = workOrder.partsUsed || [];
+            const partsUsed = [
+              ...currentPartsEntries,
+              {
+                id: `part-${workOrder.id}-${Date.now()}`,
+                inventoryItemId: entry.inventoryItemId,
+                itemName: entry.itemName,
+                quantity: entry.quantity,
+                unitCost: entry.unitCost,
+                date: entryDate,
+              },
+            ];
+            const totalLabourCost = calculateLabourCost(currentLabourEntries);
+            const totalPartsCost = calculatePartsCost(partsUsed);
+
+            return {
+              ...workOrder,
+              updatedAt: nowIso,
+              partsUsed,
+              totalLabourCost,
+              totalPartsCost,
+              totalCost: totalLabourCost + totalPartsCost,
+            };
+          }),
+        }));
+      },
       generateWOFromPMSchedule: (pmSchedule) => {
         const currentWorkOrders = get().workOrders;
         const now = new Date();
@@ -333,6 +473,11 @@ export const useStore = create<AppState>()(
               createdAt: now.toISOString(),
             },
           ],
+          labourEntries: [],
+          partsUsed: [],
+          totalLabourCost: 0,
+          totalPartsCost: 0,
+          totalCost: 0,
         };
 
         set((state) => ({

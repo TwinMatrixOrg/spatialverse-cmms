@@ -76,6 +76,7 @@ import {
   getAssetById,
   getSiteById,
   getUserById,
+  inventoryItems,
   nextStatusMap,
   Priority,
   prioritySLAHours,
@@ -113,6 +114,14 @@ type CreateWorkOrderFormData = {
 };
 
 const formatWONumber = (number: string) => (number.startsWith('#') ? number : `#${number}`);
+
+const formatRM = (value: number) =>
+  `RM ${value.toLocaleString('en-MY', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+
+const toDateInputValue = (isoDate: string) => format(new Date(isoDate), 'yyyy-MM-dd');
 
 const formatDuration = (durationMs: number) => {
   const totalMinutes = Math.max(0, Math.floor(durationMs / (1000 * 60)));
@@ -328,7 +337,16 @@ function KanbanColumn({
 }
 
 export default function WorkOrders() {
-  const { selectedSiteId, workOrders, updateWorkOrderStatus, createWorkOrder, toggleChecklistItem, addWorkOrderComment } =
+  const {
+    selectedSiteId,
+    workOrders,
+    updateWorkOrderStatus,
+    createWorkOrder,
+    toggleChecklistItem,
+    addWorkOrderComment,
+    addLabourEntry,
+    addPartsEntry,
+  } =
     useStore();
   const location = useLocation();
   const now = useMinuteTicker();
@@ -591,6 +609,8 @@ export default function WorkOrders() {
             onClose={() => setSelectedWOId(null)}
             onToggleChecklist={(checklistItemId) => toggleChecklistItem(selectedWO.id, checklistItemId)}
             onAddComment={(message) => addWorkOrderComment(selectedWO.id, message)}
+            onAddLabourEntry={(entry) => addLabourEntry(selectedWO.id, entry)}
+            onAddPartsEntry={(entry) => addPartsEntry(selectedWO.id, entry)}
             onUpdateStatus={(status, comment) =>
               updateWorkOrderStatus({ workOrderId: selectedWO.id, status, comment })
             }
@@ -642,6 +662,8 @@ function WODetailPanel({
   onClose,
   onToggleChecklist,
   onAddComment,
+  onAddLabourEntry,
+  onAddPartsEntry,
   onUpdateStatus,
 }: {
   wo: WorkOrder;
@@ -649,6 +671,21 @@ function WODetailPanel({
   onClose: () => void;
   onToggleChecklist: (checklistItemId: string) => void;
   onAddComment: (message: string) => void;
+  onAddLabourEntry: (entry: {
+    technicianId: string;
+    technicianName: string;
+    hours: number;
+    ratePerHour: number;
+    date?: string;
+    description?: string;
+  }) => void;
+  onAddPartsEntry: (entry: {
+    inventoryItemId: string;
+    itemName: string;
+    quantity: number;
+    unitCost: number;
+    date?: string;
+  }) => void;
   onUpdateStatus: (status: WorkOrderStatus, comment?: string) => void;
 }) {
   const [activeTab, setActiveTab] = useState(0);
@@ -656,18 +693,55 @@ function WODetailPanel({
   const [nextStatus, setNextStatus] = useState<WorkOrderStatus | ''>('');
   const [statusComment, setStatusComment] = useState('');
   const [newComment, setNewComment] = useState('');
+  const [labourTechnicianId, setLabourTechnicianId] = useState('');
+  const [labourHours, setLabourHours] = useState('');
+  const [labourRatePerHour, setLabourRatePerHour] = useState('');
+  const [labourDescription, setLabourDescription] = useState('');
+  const [labourDate, setLabourDate] = useState(() => format(new Date(), 'yyyy-MM-dd'));
+  const [partItemId, setPartItemId] = useState('');
+  const [partQuantity, setPartQuantity] = useState('');
+  const [partUnitCost, setPartUnitCost] = useState('');
+  const [partDate, setPartDate] = useState(() => format(new Date(), 'yyyy-MM-dd'));
   const asset = getAssetById(wo.assetId);
   const reportedBy = wo.reportedById ? getUserById(wo.reportedById) : null;
   const site = getSiteById(wo.siteId);
   const statusColor = statusColumns.find((column) => column.id === wo.status)?.color || '#666';
   const { progress, isOverdue, timeLeft } = getSLAState(wo.createdAt, wo.slaDeadline, now);
   const availableNextStatuses = nextStatusMap[wo.status] || [];
+  const availableTechnicians = useMemo(
+    () => technicians.filter((technician) => technician.siteIds.includes(wo.siteId)),
+    [wo.siteId]
+  );
+  const availableParts = useMemo(() => {
+    const items = inventoryItems.filter((item) => item.siteId === wo.siteId);
+    return items.length > 0 ? items : inventoryItems;
+  }, [wo.siteId]);
+  const labourEntries = [...(wo.labourEntries || [])].sort(
+    (entryA, entryB) => new Date(entryB.date).getTime() - new Date(entryA.date).getTime()
+  );
+  const partsEntries = [...(wo.partsUsed || [])].sort(
+    (entryA, entryB) => new Date(entryB.date).getTime() - new Date(entryA.date).getTime()
+  );
+  const totalLabourCost = wo.totalLabourCost || 0;
+  const totalPartsCost = wo.totalPartsCost || 0;
+  const grandTotalCost = wo.totalCost || totalLabourCost + totalPartsCost;
 
   useEffect(() => {
     setActiveTab(0);
     setStatusComment('');
     setNewComment('');
     setNextStatus(availableNextStatuses[0] || '');
+    setLabourTechnicianId(wo.assignedToId || availableTechnicians[0]?.id || '');
+    setLabourHours('');
+    setLabourRatePerHour('');
+    setLabourDescription('');
+    setLabourDate(toDateInputValue(wo.updatedAt));
+
+    const defaultPart = availableParts[0];
+    setPartItemId(defaultPart?.id || '');
+    setPartQuantity('');
+    setPartUnitCost(defaultPart?.unitCost ? String(defaultPart.unitCost) : '');
+    setPartDate(toDateInputValue(wo.updatedAt));
   }, [wo.id, availableNextStatuses]);
 
   const handleSaveStatusUpdate = () => {
@@ -686,6 +760,57 @@ function WODetailPanel({
   const timelineEntries = [...(wo.timeline || [])].sort(
     (entryA, entryB) => new Date(entryA.createdAt).getTime() - new Date(entryB.createdAt).getTime()
   );
+
+  const handlePartSelectionChange = (inventoryItemId: string) => {
+    setPartItemId(inventoryItemId);
+    const selectedPart = availableParts.find((item) => item.id === inventoryItemId);
+    if (selectedPart?.unitCost) {
+      setPartUnitCost(String(selectedPart.unitCost));
+    }
+  };
+
+  const handleAddLabour = () => {
+    const selectedTechnician = availableTechnicians.find((technician) => technician.id === labourTechnicianId);
+    const parsedHours = Number(labourHours);
+    const parsedRatePerHour = Number(labourRatePerHour);
+
+    if (!selectedTechnician || parsedHours <= 0 || parsedRatePerHour <= 0 || !labourDate) {
+      return;
+    }
+
+    onAddLabourEntry({
+      technicianId: selectedTechnician.id,
+      technicianName: `${selectedTechnician.firstName} ${selectedTechnician.lastName}`,
+      hours: parsedHours,
+      ratePerHour: parsedRatePerHour,
+      date: new Date(`${labourDate}T08:00:00`).toISOString(),
+      description: labourDescription.trim() || undefined,
+    });
+
+    setLabourHours('');
+    setLabourRatePerHour('');
+    setLabourDescription('');
+  };
+
+  const handleAddPart = () => {
+    const selectedPart = availableParts.find((part) => part.id === partItemId);
+    const parsedQuantity = Number(partQuantity);
+    const parsedUnitCost = Number(partUnitCost);
+
+    if (!selectedPart || parsedQuantity <= 0 || parsedUnitCost <= 0 || !partDate) {
+      return;
+    }
+
+    onAddPartsEntry({
+      inventoryItemId: selectedPart.id,
+      itemName: selectedPart.name,
+      quantity: parsedQuantity,
+      unitCost: parsedUnitCost,
+      date: new Date(`${partDate}T08:00:00`).toISOString(),
+    });
+
+    setPartQuantity('');
+  };
 
   return (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -852,6 +977,7 @@ function WODetailPanel({
           <Tab label="Timeline" />
           <Tab label="Checklist" />
           <Tab label="Updates" />
+          <Tab label="Costs" />
         </Tabs>
 
         {activeTab === 0 && (
@@ -944,6 +1070,232 @@ function WODetailPanel({
                 <SendIcon />
               </IconButton>
             </Box>
+          </Box>
+        )}
+
+        {activeTab === 3 && (
+          <Box sx={{ mt: 1.5 }}>
+            <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>
+              Labour Entries
+            </Typography>
+            <TableContainer component={Paper} variant="outlined" sx={{ mb: 2 }}>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Date</TableCell>
+                    <TableCell>Technician</TableCell>
+                    <TableCell align="right">Hours</TableCell>
+                    <TableCell align="right">Rate (RM/hr)</TableCell>
+                    <TableCell align="right">Cost</TableCell>
+                    <TableCell>Description</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {labourEntries.map((entry) => (
+                    <TableRow key={entry.id}>
+                      <TableCell>{format(new Date(entry.date), 'MMM d, yyyy')}</TableCell>
+                      <TableCell>{entry.technicianName}</TableCell>
+                      <TableCell align="right">{entry.hours.toFixed(1)}</TableCell>
+                      <TableCell align="right">{formatRM(entry.ratePerHour)}</TableCell>
+                      <TableCell align="right">{formatRM(entry.hours * entry.ratePerHour)}</TableCell>
+                      <TableCell>{entry.description || '-'}</TableCell>
+                    </TableRow>
+                  ))}
+                  {labourEntries.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={6}>
+                        <Typography variant="body2" color="text.secondary" sx={{ py: 1 }}>
+                          No labour entries recorded yet.
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+
+            <Typography variant="body2" fontWeight={700} sx={{ mb: 1 }}>
+              Add Labour
+            </Typography>
+            <Box sx={{ display: 'grid', gap: 1, gridTemplateColumns: 'repeat(12, minmax(0, 1fr))', mb: 2 }}>
+              <FormControl size="small" sx={{ gridColumn: { xs: 'span 12', sm: 'span 4' } }}>
+                <InputLabel>Technician</InputLabel>
+                <Select
+                  value={labourTechnicianId}
+                  label="Technician"
+                  onChange={(event) => setLabourTechnicianId(event.target.value)}
+                >
+                  {availableTechnicians.map((technician) => (
+                    <MenuItem key={technician.id} value={technician.id}>
+                      {technician.firstName} {technician.lastName}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <TextField
+                size="small"
+                type="number"
+                label="Hours"
+                value={labourHours}
+                onChange={(event) => setLabourHours(event.target.value)}
+                sx={{ gridColumn: { xs: 'span 6', sm: 'span 2' } }}
+              />
+              <TextField
+                size="small"
+                type="number"
+                label="Rate (RM/hr)"
+                value={labourRatePerHour}
+                onChange={(event) => setLabourRatePerHour(event.target.value)}
+                sx={{ gridColumn: { xs: 'span 6', sm: 'span 2' } }}
+              />
+              <TextField
+                size="small"
+                type="date"
+                label="Date"
+                value={labourDate}
+                onChange={(event) => setLabourDate(event.target.value)}
+                sx={{ gridColumn: { xs: 'span 12', sm: 'span 2' } }}
+                slotProps={{ inputLabel: { shrink: true } }}
+              />
+              <Button
+                variant="contained"
+                size="small"
+                onClick={handleAddLabour}
+                sx={{ gridColumn: { xs: 'span 12', sm: 'span 2' } }}
+              >
+                Add Labour
+              </Button>
+              <TextField
+                size="small"
+                label="Description"
+                value={labourDescription}
+                onChange={(event) => setLabourDescription(event.target.value)}
+                sx={{ gridColumn: 'span 12' }}
+              />
+            </Box>
+
+            <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>
+              Parts Used
+            </Typography>
+            <TableContainer component={Paper} variant="outlined" sx={{ mb: 2 }}>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Date</TableCell>
+                    <TableCell>Item</TableCell>
+                    <TableCell align="right">Qty</TableCell>
+                    <TableCell align="right">Unit Cost</TableCell>
+                    <TableCell align="right">Cost</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {partsEntries.map((entry) => (
+                    <TableRow key={entry.id}>
+                      <TableCell>{format(new Date(entry.date), 'MMM d, yyyy')}</TableCell>
+                      <TableCell>{entry.itemName}</TableCell>
+                      <TableCell align="right">{entry.quantity}</TableCell>
+                      <TableCell align="right">{formatRM(entry.unitCost)}</TableCell>
+                      <TableCell align="right">{formatRM(entry.quantity * entry.unitCost)}</TableCell>
+                    </TableRow>
+                  ))}
+                  {partsEntries.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={5}>
+                        <Typography variant="body2" color="text.secondary" sx={{ py: 1 }}>
+                          No parts usage recorded yet.
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+
+            <Typography variant="body2" fontWeight={700} sx={{ mb: 1 }}>
+              Add Part
+            </Typography>
+            <Box sx={{ display: 'grid', gap: 1, gridTemplateColumns: 'repeat(12, minmax(0, 1fr))', mb: 2.5 }}>
+              <FormControl size="small" sx={{ gridColumn: { xs: 'span 12', sm: 'span 5' } }}>
+                <InputLabel>Inventory Item</InputLabel>
+                <Select
+                  value={partItemId}
+                  label="Inventory Item"
+                  onChange={(event) => handlePartSelectionChange(event.target.value)}
+                >
+                  {availableParts.map((item) => (
+                    <MenuItem key={item.id} value={item.id}>
+                      {item.name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <TextField
+                size="small"
+                type="number"
+                label="Quantity"
+                value={partQuantity}
+                onChange={(event) => setPartQuantity(event.target.value)}
+                sx={{ gridColumn: { xs: 'span 6', sm: 'span 2' } }}
+              />
+              <TextField
+                size="small"
+                type="number"
+                label="Unit Cost (RM)"
+                value={partUnitCost}
+                onChange={(event) => setPartUnitCost(event.target.value)}
+                sx={{ gridColumn: { xs: 'span 6', sm: 'span 2' } }}
+              />
+              <TextField
+                size="small"
+                type="date"
+                label="Date"
+                value={partDate}
+                onChange={(event) => setPartDate(event.target.value)}
+                sx={{ gridColumn: { xs: 'span 12', sm: 'span 2' } }}
+                slotProps={{ inputLabel: { shrink: true } }}
+              />
+              <Button
+                variant="contained"
+                size="small"
+                onClick={handleAddPart}
+                sx={{ gridColumn: { xs: 'span 12', sm: 'span 1' } }}
+              >
+                Add
+              </Button>
+            </Box>
+
+            <Card variant="outlined">
+              <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
+                <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>
+                  Cost Summary (RM)
+                </Typography>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    Labour Cost
+                  </Typography>
+                  <Typography variant="body2" fontWeight={600}>
+                    {formatRM(totalLabourCost)}
+                  </Typography>
+                </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    Parts Cost
+                  </Typography>
+                  <Typography variant="body2" fontWeight={600}>
+                    {formatRM(totalPartsCost)}
+                  </Typography>
+                </Box>
+                <Divider sx={{ my: 1 }} />
+                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <Typography variant="body1" fontWeight={700}>
+                    Grand Total
+                  </Typography>
+                  <Typography variant="body1" fontWeight={700} color="primary.main">
+                    {formatRM(grandTotalCost)}
+                  </Typography>
+                </Box>
+              </CardContent>
+            </Card>
           </Box>
         )}
       </Box>

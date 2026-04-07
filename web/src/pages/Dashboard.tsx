@@ -27,6 +27,7 @@ import {
   Build as BuildIcon,
   ErrorOutline as ErrorIcon,
   AddTask as AddTaskIcon,
+  Payments as PaymentsIcon,
 } from '@mui/icons-material';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, CartesianGrid, XAxis, YAxis } from 'recharts';
 import maplibregl from 'maplibre-gl';
@@ -90,6 +91,9 @@ const getPMUrgency = (nextDueDate: string) => {
   }
   return { color: '#43A047', label: 'Upcoming' };
 };
+
+const formatRMCompact = (value: number) =>
+  `RM ${value.toLocaleString('en-MY', { maximumFractionDigits: 0 })}`;
 
 function useSLACountdown(deadline: string) {
   const [timeLeft, setTimeLeft] = useState('');
@@ -217,6 +221,18 @@ export default function Dashboard() {
 
   const kpis = getDashboardKPIs(selectedSiteId || undefined, workOrders, assets, pmSchedules);
   const woByStatus = getWorkOrdersByStatusCount(selectedSiteId || undefined, workOrders);
+  const mtdStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+  const maintenanceCostMTD = workOrders
+    .filter((workOrder) => !selectedSiteId || workOrder.siteId === selectedSiteId)
+    .reduce((sum, workOrder) => {
+      const labourCost = (workOrder.labourEntries || [])
+        .filter((entry) => new Date(entry.date) >= mtdStart)
+        .reduce((entrySum, entry) => entrySum + entry.hours * entry.ratePerHour, 0);
+      const partsCost = (workOrder.partsUsed || [])
+        .filter((entry) => new Date(entry.date) >= mtdStart)
+        .reduce((entrySum, entry) => entrySum + entry.quantity * entry.unitCost, 0);
+      return sum + labourCost + partsCost;
+    }, 0);
 
   const pieData = [
     { name: 'Open', value: woByStatus.open, color: statusColors.open },
@@ -407,15 +423,16 @@ export default function Dashboard() {
       ))}
 
       {/* KPI Cards */}
-      <Box sx={{ display: 'flex', gap: 2, mb: 3, flexWrap: 'nowrap' }}>
+      <Box sx={{ display: 'flex', gap: 2, mb: 3, flexWrap: 'wrap' }}>
         {[
           { title: 'Open Work Orders', value: kpis.openWorkOrders, icon: <WorkOrderIcon />, color: theme.palette.primary.main },
           { title: 'Overdue WOs', value: kpis.overdueWorkOrders, icon: <WarningIcon />, color: theme.palette.error.main },
           { title: 'Total Assets', value: kpis.totalAssets, subtitle: `${kpis.criticalAssets} critical`, icon: <AssetIcon />, color: theme.palette.secondary.main },
           { title: 'PM Compliance', value: `${kpis.pmComplianceRate}%`, icon: <CheckIcon />, color: theme.palette.success.main },
           { title: 'MTTR', value: `${kpis.mttr}h`, subtitle: 'Avg repair time', icon: <BuildIcon />, color: theme.palette.info.main },
+          { title: 'Maint. Cost MTD', value: formatRMCompact(maintenanceCostMTD), icon: <PaymentsIcon />, color: '#2E7D32' },
         ].map((kpi) => (
-          <Box key={kpi.title} sx={{ flex: '1 1 0', minWidth: 0 }}>
+          <Box key={kpi.title} sx={{ flex: '1 1 220px', minWidth: 0 }}>
             <KPICard {...kpi} />
           </Box>
         ))}

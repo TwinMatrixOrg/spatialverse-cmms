@@ -28,6 +28,25 @@ export interface WorkOrderComment {
   createdAt: string;
 }
 
+export interface WorkOrderLabourEntry {
+  id: string;
+  technicianId: string;
+  technicianName: string;
+  hours: number;
+  ratePerHour: number;
+  date: string;
+  description?: string;
+}
+
+export interface WorkOrderPartUsedEntry {
+  id: string;
+  inventoryItemId: string;
+  itemName: string;
+  quantity: number;
+  unitCost: number;
+  date: string;
+}
+
 export interface Site {
   id: string;
   name: string;
@@ -88,6 +107,11 @@ export interface WorkOrder {
   checklist?: WorkOrderChecklistItem[];
   timeline?: WorkOrderTimelineEntry[];
   comments?: WorkOrderComment[];
+  labourEntries: WorkOrderLabourEntry[];
+  partsUsed: WorkOrderPartUsedEntry[];
+  totalLabourCost: number;
+  totalPartsCost: number;
+  totalCost: number;
 }
 
 export interface Contractor {
@@ -349,7 +373,7 @@ export const assets: Asset[] = [
 ];
 
 // Work Orders
-export const workOrders: WorkOrder[] = [
+const baseWorkOrders: Omit<WorkOrder, 'labourEntries' | 'partsUsed' | 'totalLabourCost' | 'totalPartsCost' | 'totalCost'>[] = [
   // Open Work Orders
   {
     id: 'wo-1', number: 'WO-2024-00001', siteId: 'site-1', assetId: 'asset-2', title: 'AHU-PKL-02 Making Unusual Noise', description: 'Reported unusual grinding noise from AHU-PKL-02. Possible bearing failure.', faultType: 'Mechanical Failure', priority: 'P1', status: 'open', slaDeadline: addHours(4), createdAt: subDays(0.1), updatedAt: subDays(0.1),
@@ -509,6 +533,294 @@ export const workOrders: WorkOrder[] = [
   { id: 'wo-31', number: 'WO-2024-00031', siteId: 'site-1', assetId: 'asset-6', title: 'Generator Monthly Run', description: 'Monthly generator run and inspection.', faultType: 'Preventive Maintenance', priority: 'P4', status: 'closed', assignedToId: 'user-8', slaDeadline: addDays(3), createdAt: subDays(20), updatedAt: subDays(18), resolvedAt: subDays(18.5), closedAt: subDays(18) },
   { id: 'wo-32', number: 'WO-2024-00032', siteId: 'site-2', assetId: 'asset-28', title: 'Sprinkler System Inspection', description: 'Annual sprinkler inspection and certification.', faultType: 'Annual Inspection', priority: 'P2', status: 'closed', assignedToId: 'user-7', contractorId: 'contractor-5', slaDeadline: addDays(5), createdAt: subDays(14), updatedAt: subDays(12), resolvedAt: subDays(12.5), closedAt: subDays(12) },
 ];
+
+const workOrderCostSeeds: Partial<
+  Record<
+    string,
+    Pick<WorkOrder, 'labourEntries' | 'partsUsed' | 'totalLabourCost' | 'totalPartsCost' | 'totalCost'>
+  >
+> = {
+  'wo-1': {
+    labourEntries: [
+      {
+        id: 'lab-wo-1-1',
+        technicianId: 'user-5',
+        technicianName: 'Wong Chun Kit',
+        hours: 2.5,
+        ratePerHour: 95,
+        date: subDays(0.09),
+        description: 'Inspected AHU bearings and verified shaft alignment.',
+      },
+      {
+        id: 'lab-wo-1-2',
+        technicianId: 'user-6',
+        technicianName: 'Raj Krishnan',
+        hours: 1.5,
+        ratePerHour: 110,
+        date: subDays(0.08),
+        description: 'Applied emergency balancing and test run.',
+      },
+    ],
+    partsUsed: [
+      {
+        id: 'part-wo-1-1',
+        inventoryItemId: 'inv-20',
+        itemName: 'Bearing 6205 2RS',
+        quantity: 4,
+        unitCost: 22,
+        date: subDays(0.08),
+      },
+      {
+        id: 'part-wo-1-2',
+        inventoryItemId: 'inv-22',
+        itemName: 'Lubricant Grease 500g',
+        quantity: 2,
+        unitCost: 18,
+        date: subDays(0.08),
+      },
+    ],
+    totalLabourCost: 402.5,
+    totalPartsCost: 124,
+    totalCost: 526.5,
+  },
+  'wo-3': {
+    labourEntries: [
+      {
+        id: 'lab-wo-3-1',
+        technicianId: 'user-7',
+        technicianName: 'Mei Ling',
+        hours: 3,
+        ratePerHour: 105,
+        date: subDays(0.19),
+        description: 'Performed leak check and pressure verification.',
+      },
+      {
+        id: 'lab-wo-3-2',
+        technicianId: 'user-5',
+        technicianName: 'Wong Chun Kit',
+        hours: 1.5,
+        ratePerHour: 95,
+        date: subDays(0.18),
+        description: 'Recharged system and monitored superheat values.',
+      },
+    ],
+    partsUsed: [
+      {
+        id: 'part-wo-3-1',
+        inventoryItemId: 'inv-3',
+        itemName: 'Refrigerant R410A 11.3kg',
+        quantity: 2,
+        unitCost: 320,
+        date: subDays(0.18),
+      },
+      {
+        id: 'part-wo-3-2',
+        inventoryItemId: 'inv-4',
+        itemName: 'Compressor Oil POE 5L',
+        quantity: 1,
+        unitCost: 95,
+        date: subDays(0.18),
+      },
+    ],
+    totalLabourCost: 457.5,
+    totalPartsCost: 735,
+    totalCost: 1192.5,
+  },
+  'wo-7': {
+    labourEntries: [
+      {
+        id: 'lab-wo-7-1',
+        technicianId: 'user-5',
+        technicianName: 'Wong Chun Kit',
+        hours: 4,
+        ratePerHour: 95,
+        date: subDays(1.95),
+        description: 'Completed compressor teardown and servicing.',
+      },
+      {
+        id: 'lab-wo-7-2',
+        technicianId: 'user-6',
+        technicianName: 'Raj Krishnan',
+        hours: 2,
+        ratePerHour: 110,
+        date: subDays(1.9),
+        description: 'Commissioning checks and vibration reading.',
+      },
+    ],
+    partsUsed: [
+      {
+        id: 'part-wo-7-1',
+        inventoryItemId: 'inv-4',
+        itemName: 'Compressor Oil POE 5L',
+        quantity: 2,
+        unitCost: 95,
+        date: subDays(1.92),
+      },
+      {
+        id: 'part-wo-7-2',
+        inventoryItemId: 'inv-21',
+        itemName: 'Bearing 6310 2RS',
+        quantity: 2,
+        unitCost: 45,
+        date: subDays(1.92),
+      },
+    ],
+    totalLabourCost: 600,
+    totalPartsCost: 280,
+    totalCost: 880,
+  },
+  'wo-14': {
+    labourEntries: [
+      {
+        id: 'lab-wo-14-1',
+        technicianId: 'user-5',
+        technicianName: 'Wong Chun Kit',
+        hours: 2.5,
+        ratePerHour: 95,
+        date: subDays(1.6),
+        description: 'Removed faulty door sensor and recalibrated landing sensors.',
+      },
+    ],
+    partsUsed: [
+      {
+        id: 'part-wo-14-1',
+        inventoryItemId: 'inv-11',
+        itemName: 'Door Sensor Pair',
+        quantity: 1,
+        unitCost: 220,
+        date: subDays(1.6),
+      },
+    ],
+    totalLabourCost: 237.5,
+    totalPartsCost: 220,
+    totalCost: 457.5,
+  },
+  'wo-19': {
+    labourEntries: [
+      {
+        id: 'lab-wo-19-1',
+        technicianId: 'user-5',
+        technicianName: 'Wong Chun Kit',
+        hours: 5,
+        ratePerHour: 120,
+        date: subDays(0.14),
+        description: 'Emergency bearing replacement and alignment.',
+      },
+      {
+        id: 'lab-wo-19-2',
+        technicianId: 'user-6',
+        technicianName: 'Raj Krishnan',
+        hours: 3,
+        ratePerHour: 110,
+        date: subDays(0.12),
+        description: 'Functional tests and balancing verification.',
+      },
+    ],
+    partsUsed: [
+      {
+        id: 'part-wo-19-1',
+        inventoryItemId: 'inv-20',
+        itemName: 'Bearing 6205 2RS',
+        quantity: 6,
+        unitCost: 22,
+        date: subDays(0.13),
+      },
+      {
+        id: 'part-wo-19-2',
+        inventoryItemId: 'inv-4',
+        itemName: 'Compressor Oil POE 5L',
+        quantity: 2,
+        unitCost: 95,
+        date: subDays(0.13),
+      },
+      {
+        id: 'part-wo-19-3',
+        inventoryItemId: 'inv-1',
+        itemName: 'AHU V-Belt A68',
+        quantity: 1,
+        unitCost: 45,
+        date: subDays(0.13),
+      },
+    ],
+    totalLabourCost: 930,
+    totalPartsCost: 367,
+    totalCost: 1297,
+  },
+  'wo-21': {
+    labourEntries: [
+      {
+        id: 'lab-wo-21-1',
+        technicianId: 'user-6',
+        technicianName: 'Raj Krishnan',
+        hours: 3.5,
+        ratePerHour: 110,
+        date: subDays(0.09),
+        description: 'Lockout and breaker replacement work.',
+      },
+      {
+        id: 'lab-wo-21-2',
+        technicianId: 'user-7',
+        technicianName: 'Mei Ling',
+        hours: 2,
+        ratePerHour: 105,
+        date: subDays(0.09),
+        description: 'Thermal scan and panel testing after replacement.',
+      },
+    ],
+    partsUsed: [
+      {
+        id: 'part-wo-21-1',
+        inventoryItemId: 'inv-7',
+        itemName: 'Circuit Breaker 100A 3P',
+        quantity: 1,
+        unitCost: 450,
+        date: subDays(0.09),
+      },
+      {
+        id: 'part-wo-21-2',
+        inventoryItemId: 'inv-10',
+        itemName: 'Fuse 63A HRC',
+        quantity: 2,
+        unitCost: 35,
+        date: subDays(0.09),
+      },
+      {
+        id: 'part-wo-21-3',
+        inventoryItemId: 'inv-23',
+        itemName: 'Cable Tie 300mm (100pc)',
+        quantity: 1,
+        unitCost: 12,
+        date: subDays(0.09),
+      },
+    ],
+    totalLabourCost: 595,
+    totalPartsCost: 532,
+    totalCost: 1127,
+  },
+};
+
+const calculateLabourCost = (entries: WorkOrderLabourEntry[]) =>
+  entries.reduce((sum, entry) => sum + entry.hours * entry.ratePerHour, 0);
+
+const calculatePartsCost = (entries: WorkOrderPartUsedEntry[]) =>
+  entries.reduce((sum, entry) => sum + entry.quantity * entry.unitCost, 0);
+
+export const workOrders: WorkOrder[] = baseWorkOrders.map((workOrder) => {
+  const seededCost = workOrderCostSeeds[workOrder.id];
+  const labourEntries = seededCost?.labourEntries || [];
+  const partsUsed = seededCost?.partsUsed || [];
+  const totalLabourCost = seededCost?.totalLabourCost ?? calculateLabourCost(labourEntries);
+  const totalPartsCost = seededCost?.totalPartsCost ?? calculatePartsCost(partsUsed);
+
+  return {
+    ...workOrder,
+    labourEntries,
+    partsUsed,
+    totalLabourCost,
+    totalPartsCost,
+    totalCost: seededCost?.totalCost ?? totalLabourCost + totalPartsCost,
+  };
+});
 
 // Contractors
 export const contractors: Contractor[] = [
