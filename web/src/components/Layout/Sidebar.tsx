@@ -90,43 +90,35 @@ export default function Sidebar({ open, onClose, drawerWidth, collapsedWidth, is
           minHeight: 64,
         }}
       >
-        <Box
-          sx={{
-            width: 36,
-            height: 36,
-            borderRadius: 2,
-            background: 'linear-gradient(135deg, #00BCD4 0%, #0A1628 100%)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            mr: open || isMobile ? 1.5 : 0,
-          }}
-        >
-          <Typography variant="h6" sx={{ color: 'white', fontWeight: 700, fontSize: '1rem' }}>
-            SV
-          </Typography>
-        </Box>
-        {(open || isMobile) && (
-          <Box>
-            <Typography
-              variant="subtitle1"
-              sx={{
-                fontWeight: 700,
-                color: 'primary.main',
-                lineHeight: 1.2,
-              }}
-            >
-              SpatialVerse Pulse
-            </Typography>
-            <Typography
-              variant="caption"
-              sx={{
-                color: 'text.secondary',
-                fontSize: '0.65rem',
-                letterSpacing: '0.1em',
-              }}
-            >
-              FM PLATFORM
+        {open || isMobile ? (
+          /* Expanded: show full logo image */
+          <Box
+            component="img"
+            src="/cmms/sv-pulse-logo.jpg"
+            alt="SpatialVerse Pulse"
+            sx={{
+              height: 40,
+              maxWidth: 200,
+              objectFit: 'contain',
+              objectPosition: 'left center',
+              borderRadius: 1,
+            }}
+          />
+        ) : (
+          /* Collapsed: show icon-only box */
+          <Box
+            sx={{
+              width: 36,
+              height: 36,
+              borderRadius: 2,
+              background: 'linear-gradient(135deg, #00BCD4 0%, #0A1628 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Typography variant="h6" sx={{ color: 'white', fontWeight: 700, fontSize: '1rem' }}>
+              SP
             </Typography>
           </Box>
         )}
