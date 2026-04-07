@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useMemo } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Box,
   Card,
@@ -141,6 +142,8 @@ const getMTBFMeta = (mtbfDays?: number) => {
 
 export default function Assets() {
   const theme = useTheme();
+  const location = useLocation();
+  const navigate = useNavigate();
   const {
     selectedSiteId,
     workOrders,
@@ -155,6 +158,20 @@ export default function Assets() {
   const [typeFilter, setTypeFilter] = useState<AssetType | 'all'>('all');
   const [healthFilter, setHealthFilter] = useState<'all' | 'critical' | 'warning' | 'good'>('all');
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
+
+  // Auto-open asset drawer when navigated from map popup (?asset=ID)
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const assetId = params.get('asset');
+    if (assetId) {
+      const found = assets.find(a => a.id === assetId);
+      if (found) {
+        setSelectedAsset(found);
+        // Clear the query param without full reload
+        navigate('/assets', { replace: true });
+      }
+    }
+  }, [location.search, navigate]);
 
   const getCalculatedHealthScore = (assetId: string) =>
     calculateAssetHealth(assetId, workOrders, pmSchedules);

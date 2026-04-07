@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Card,
@@ -217,6 +218,7 @@ function SLABadge({ deadline, status }: { deadline: string; status: string }) {
 export default function Dashboard() {
   const theme = useTheme();
   const { mode: themeMode } = useThemeContext();
+  const navigate = useNavigate();
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
   const {
@@ -379,16 +381,31 @@ export default function Dashboard() {
       markerEl.style.cursor = 'pointer';
       markerEl.style.backgroundColor = healthColors[healthStatus];
 
-      const popup = new maplibregl.Popup({ offset: 25 }).setHTML(`
-        <div style="font-family: Inter, sans-serif; padding: 4px;">
-          <strong style="font-size: 14px;">${asset.name}</strong>
-          <div style="font-size: 12px; color: #666; margin-top: 2px;">${asset.type}</div>
-          <div style="font-size: 12px; margin-top: 4px;">
-            Health: <span style="color: ${healthColors[healthStatus]}; font-weight: 600;">${healthScore}%</span>
+      const popup = new maplibregl.Popup({ offset: 25, maxWidth: '220px' })
+        .setHTML(`
+          <div style="font-family: Inter, sans-serif; padding: 4px 2px;">
+            <strong style="font-size: 14px; display:block; margin-bottom:2px;">${asset.name}</strong>
+            <div style="font-size: 11px; color: #888; margin-bottom:6px;">${asset.type}</div>
+            <div style="font-size: 12px; margin-bottom:4px;">
+              Health: <span style="color: ${healthColors[healthStatus]}; font-weight: 600;">${healthScore}%</span>
+            </div>
+            ${openWorkOrderCount > 0 ? `<div style="font-size: 12px; color: #EF5350; margin-bottom:6px;">Open WOs: ${openWorkOrderCount}</div>` : '<div style="margin-bottom:6px;"></div>'}
+            <button
+              data-asset-id="${asset.id}"
+              style="width:100%;padding:5px 0;background:#00BCD4;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:600;cursor:pointer;letter-spacing:0.3px;"
+            >View Asset →</button>
           </div>
-          ${openWorkOrderCount > 0 ? `<div style="font-size: 12px; color: #EF5350;">Open WOs: ${openWorkOrderCount}</div>` : ''}
-        </div>
-      `);
+        `);
+
+      popup.on('open', () => {
+        const btn = document.querySelector<HTMLButtonElement>(`button[data-asset-id="${asset.id}"]`);
+        if (btn) {
+          btn.onclick = () => {
+            popup.remove();
+            navigate(`/assets?asset=${asset.id}`);
+          };
+        }
+      });
 
       new maplibregl.Marker({ element: markerEl })
         .setLngLat([asset.location.lng, asset.location.lat])
