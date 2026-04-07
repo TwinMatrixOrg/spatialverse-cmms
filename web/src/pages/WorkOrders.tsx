@@ -28,6 +28,9 @@ import {
   Paper,
   Select,
   SelectChangeEvent,
+  Step,
+  StepLabel,
+  Stepper,
   Snackbar,
   Tab,
   Table,
@@ -82,6 +85,8 @@ import {
   prioritySLAHours,
   technicians,
   WorkOrder,
+  WorkOrderApprovalStep,
+  WorkOrderApprovalStatus,
   WorkOrderStatus,
   workOrderFaultTypes,
   workOrderStatusLabels,
@@ -103,6 +108,56 @@ const priorityColors: Record<Priority, string> = {
   P3: '#FFEE58',
   P4: '#66BB6A',
 };
+
+const approvalStatusLabels: Record<WorkOrderApprovalStatus, string> = {
+  not_required: 'Not Required',
+  pending_supervisor: 'Pending Supervisor',
+  pending_manager: 'Pending FM Manager',
+  approved: 'Approved',
+  rejected: 'Rejected',
+};
+
+const approvalStatusColors: Record<WorkOrderApprovalStatus, string> = {
+  not_required: '#90A4AE',
+  pending_supervisor: '#FFA726',
+  pending_manager: '#42A5F5',
+  approved: '#66BB6A',
+  rejected: '#EF5350',
+};
+
+const defaultApprovalChain: WorkOrderApprovalStep[] = [
+  { level: 1 as const, role: 'Supervisor' as const },
+  { level: 2 as const, role: 'FM Manager' as const },
+];
+
+const currentApprovalUser = {
+  id: 'user-2',
+  name: 'Lee Wei Ming',
+  role: 'FM Manager' as const,
+};
+
+const getApprovalStatus = (workOrder: WorkOrder): WorkOrderApprovalStatus =>
+  workOrder.approvalStatus || 'not_required';
+
+const getApprovalChain = (workOrder: WorkOrder): WorkOrderApprovalStep[] =>
+  (workOrder.approvalChain && workOrder.approvalChain.length > 0 ? workOrder.approvalChain : defaultApprovalChain).map(
+    (step) => ({ ...step })
+  );
+
+function ApprovalStatusChip({ approvalStatus, size = 'small' }: { approvalStatus: WorkOrderApprovalStatus; size?: 'small' | 'medium' }) {
+  const color = approvalStatusColors[approvalStatus];
+  return (
+    <Chip
+      size={size}
+      label={approvalStatusLabels[approvalStatus]}
+      sx={{
+        backgroundColor: alpha(color, 0.15),
+        color,
+        fontWeight: 600,
+      }}
+    />
+  );
+}
 
 type CreateWorkOrderFormData = {
   assetId: string;
@@ -166,6 +221,7 @@ function WOCard({ wo, now, onClick }: { wo: WorkOrder; now: Date; onClick: () =>
   const assignee = wo.assignedToId ? getUserById(wo.assignedToId) : null;
   const { timeLeft, isOverdue } = getSLAState(wo.createdAt, wo.slaDeadline, now);
   const showSLA = !['resolved', 'closed'].includes(wo.status);
+  const approvalStatus = getApprovalStatus(wo);
 
   return (
     <Card
@@ -204,6 +260,9 @@ function WOCard({ wo, now, onClick }: { wo: WorkOrder; now: Date; onClick: () =>
         <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
           {wo.faultType}
         </Typography>
+        <Box sx={{ mb: 1.5 }}>
+          <ApprovalStatusChip approvalStatus={approvalStatus} />
+        </Box>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           {showSLA ? (
             <Chip
@@ -346,11 +405,13 @@ export default function WorkOrders() {
     addWorkOrderComment,
     addLabourEntry,
     addPartsEntry,
-  } =
-    useStore();
+    approveWorkOrder,
+    rejectWorkOrder,
+  } = useStore();
   const location = useLocation();
   const now = useMinuteTicker();
   const [viewMode, setViewMode] = useState<'kanban' | 'list'>('kanban');
+  const [listFilterTab, setListFilterTab] = useState<'all' | 'my_approvals'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [priorityFilter, setPriorityFilter] = useState<Priority | 'all'>('all');
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
@@ -380,9 +441,24 @@ export default function WorkOrders() {
     }
   }, [location.search, workOrders]);
 
+  const myApprovalsCount = useMemo(
+    () =>
+      workOrders.filter((workOrder) => {
+        if (selectedSiteId && workOrder.siteId !== selectedSiteId) return false;
+        return ['pending_supervisor', 'pending_manager'].includes(getApprovalStatus(workOrder));
+      }).length,
+    [selectedSiteId, workOrders]
+  );
+
   const filteredWOs = useMemo(() => {
     return workOrders.filter((workOrder) => {
       if (selectedSiteId && workOrder.siteId !== selectedSiteId) return false;
+      if (
+        listFilterTab === 'my_approvals' &&
+        !['pending_supervisor', 'pending_manager'].includes(getApprovalStatus(workOrder))
+      ) {
+        return false;
+      }
       if (priorityFilter !== 'all' && workOrder.priority !== priorityFilter) return false;
       if (searchQuery) {
         const search = searchQuery.toLowerCase();
@@ -395,7 +471,7 @@ export default function WorkOrders() {
       }
       return true;
     });
-  }, [priorityFilter, searchQuery, selectedSiteId, workOrders]);
+  }, [listFilterTab, priorityFilter, searchQuery, selectedSiteId, workOrders]);
 
   const wosByStatus = useMemo(() => {
     const grouped: Record<WorkOrderStatus, WorkOrder[]> = {
@@ -454,6 +530,15 @@ export default function WorkOrders() {
           Create Work Order
         </Button>
       </Box>
+
+      <Tabs
+        value={listFilterTab}
+        onChange={(_, value: 'all' | 'my_approvals') => setListFilterTab(value)}
+        sx={{ mb: 2, borderBottom: '1px solid', borderColor: 'divider' }}
+      >
+        <Tab value="all" label="All Work Orders" />
+        <Tab value="my_approvals" label={`My Approvals (${myApprovalsCount})`} />
+      </Tabs>
 
       <Box sx={{ display: 'flex', gap: 2, mb: 3, flexWrap: 'wrap' }}>
         <TextField
@@ -533,6 +618,7 @@ export default function WorkOrders() {
                 <TableCell>Fault Type</TableCell>
                 <TableCell>Priority</TableCell>
                 <TableCell>Status</TableCell>
+                <TableCell>Approval</TableCell>
                 <TableCell>SLA</TableCell>
                 <TableCell>Assignee</TableCell>
                 <TableCell>Site</TableCell>
@@ -583,6 +669,9 @@ export default function WorkOrders() {
                         }}
                       />
                     </TableCell>
+                    <TableCell>
+                      <ApprovalStatusChip approvalStatus={getApprovalStatus(workOrder)} />
+                    </TableCell>
                     <TableCell>{showSLA && <SLAChip createdAt={workOrder.createdAt} deadline={workOrder.slaDeadline} now={now} />}</TableCell>
                     <TableCell>{assignee ? `${assignee.firstName} ${assignee.lastName}` : '-'}</TableCell>
                     <TableCell>{site?.name}</TableCell>
@@ -613,6 +702,12 @@ export default function WorkOrders() {
             onAddPartsEntry={(entry) => addPartsEntry(selectedWO.id, entry)}
             onUpdateStatus={(status, comment) =>
               updateWorkOrderStatus({ workOrderId: selectedWO.id, status, comment })
+            }
+            onApproveWorkOrder={(level, comment) =>
+              approveWorkOrder(selectedWO.id, level, currentApprovalUser.id, currentApprovalUser.name, comment)
+            }
+            onRejectWorkOrder={(level, comment) =>
+              rejectWorkOrder(selectedWO.id, level, currentApprovalUser.id, currentApprovalUser.name, comment)
             }
           />
         )}
@@ -665,6 +760,8 @@ function WODetailPanel({
   onAddLabourEntry,
   onAddPartsEntry,
   onUpdateStatus,
+  onApproveWorkOrder,
+  onRejectWorkOrder,
 }: {
   wo: WorkOrder;
   now: Date;
@@ -687,6 +784,8 @@ function WODetailPanel({
     date?: string;
   }) => void;
   onUpdateStatus: (status: WorkOrderStatus, comment?: string) => void;
+  onApproveWorkOrder: (level: 1 | 2, comment?: string) => void;
+  onRejectWorkOrder: (level: 1 | 2, comment: string) => void;
 }) {
   const [activeTab, setActiveTab] = useState(0);
   const [updateStatusOpen, setUpdateStatusOpen] = useState(false);
@@ -702,6 +801,8 @@ function WODetailPanel({
   const [partQuantity, setPartQuantity] = useState('');
   const [partUnitCost, setPartUnitCost] = useState('');
   const [partDate, setPartDate] = useState(() => format(new Date(), 'yyyy-MM-dd'));
+  const [approvalComment, setApprovalComment] = useState('');
+  const [approvalError, setApprovalError] = useState('');
   const asset = getAssetById(wo.assetId);
   const reportedBy = wo.reportedById ? getUserById(wo.reportedById) : null;
   const site = getSiteById(wo.siteId);
@@ -725,11 +826,27 @@ function WODetailPanel({
   const totalLabourCost = wo.totalLabourCost || 0;
   const totalPartsCost = wo.totalPartsCost || 0;
   const grandTotalCost = wo.totalCost || totalLabourCost + totalPartsCost;
+  const approvalStatus = getApprovalStatus(wo);
+  const approvalChain = getApprovalChain(wo).sort((entryA, entryB) => entryA.level - entryB.level);
+  const pendingApprovalLevel =
+    approvalStatus === 'pending_supervisor' ? 1 : approvalStatus === 'pending_manager' ? 2 : null;
+  const activeApprovalStep = (() => {
+    if (approvalStatus === 'pending_supervisor') return 0;
+    if (approvalStatus === 'pending_manager') return 1;
+    if (approvalStatus === 'rejected') {
+      const rejectedIndex = approvalChain.findIndex((step) => step.action === 'rejected');
+      return rejectedIndex >= 0 ? rejectedIndex : 0;
+    }
+    if (approvalStatus === 'approved') return approvalChain.length;
+    return -1;
+  })();
 
   useEffect(() => {
     setActiveTab(0);
     setStatusComment('');
     setNewComment('');
+    setApprovalComment('');
+    setApprovalError('');
     setNextStatus(availableNextStatuses[0] || '');
     setLabourTechnicianId(wo.assignedToId || availableTechnicians[0]?.id || '');
     setLabourHours('');
@@ -755,6 +872,28 @@ function WODetailPanel({
     if (!newComment.trim()) return;
     onAddComment(newComment.trim());
     setNewComment('');
+  };
+
+  const handleApprove = () => {
+    if (!pendingApprovalLevel) return;
+
+    onApproveWorkOrder(pendingApprovalLevel, approvalComment.trim() || undefined);
+    setApprovalComment('');
+    setApprovalError('');
+  };
+
+  const handleReject = () => {
+    if (!pendingApprovalLevel) return;
+
+    const trimmedComment = approvalComment.trim();
+    if (!trimmedComment) {
+      setApprovalError('Rejection comment is required.');
+      return;
+    }
+
+    onRejectWorkOrder(pendingApprovalLevel, trimmedComment);
+    setApprovalComment('');
+    setApprovalError('');
   };
 
   const timelineEntries = [...(wo.timeline || [])].sort(
@@ -847,6 +986,7 @@ function WODetailPanel({
                 color: statusColor,
               }}
             />
+            <ApprovalStatusChip approvalStatus={approvalStatus} />
           </Box>
         </Box>
         <IconButton onClick={onClose}>
@@ -978,6 +1118,7 @@ function WODetailPanel({
           <Tab label="Checklist" />
           <Tab label="Updates" />
           <Tab label="Costs" />
+          <Tab label="Approvals" />
         </Tabs>
 
         {activeTab === 0 && (
@@ -1296,6 +1437,78 @@ function WODetailPanel({
                 </Box>
               </CardContent>
             </Card>
+          </Box>
+        )}
+
+        {activeTab === 4 && (
+          <Box sx={{ mt: 2 }}>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+              Current approver: {currentApprovalUser.name} ({currentApprovalUser.role})
+            </Typography>
+            <Stepper activeStep={activeApprovalStep} orientation="vertical">
+              {approvalChain.map((step) => {
+                const stepStatus = step.action
+                  ? `${step.action === 'approved' ? 'Approved' : 'Rejected'} by ${step.approverName || step.role}`
+                  : 'Pending action';
+
+                return (
+                  <Step key={step.level} completed={step.action === 'approved'}>
+                    <StepLabel error={step.action === 'rejected'}>
+                      {`Level ${step.level} • ${step.role}`}
+                    </StepLabel>
+                    <Box sx={{ pl: 1, pb: 1 }}>
+                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                        {stepStatus}
+                      </Typography>
+                      {step.comment && (
+                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                          {step.comment}
+                        </Typography>
+                      )}
+                      {step.timestamp && (
+                        <Typography variant="caption" color="text.disabled" sx={{ display: 'block' }}>
+                          {format(new Date(step.timestamp), 'MMM d, yyyy HH:mm')}
+                        </Typography>
+                      )}
+                    </Box>
+                  </Step>
+                );
+              })}
+            </Stepper>
+
+            {pendingApprovalLevel && (
+              <Box sx={{ mt: 2 }}>
+                <TextField
+                  fullWidth
+                  multiline
+                  minRows={2}
+                  label="Approval Comment"
+                  value={approvalComment}
+                  onChange={(event) => {
+                    setApprovalComment(event.target.value);
+                    if (approvalError) {
+                      setApprovalError('');
+                    }
+                  }}
+                  error={Boolean(approvalError)}
+                  helperText={approvalError || 'Comment is optional for approve and required for reject.'}
+                />
+                <Box sx={{ display: 'flex', gap: 1.5, mt: 1.5 }}>
+                  <Button variant="contained" color="success" onClick={handleApprove}>
+                    Approve
+                  </Button>
+                  <Button variant="contained" color="error" onClick={handleReject}>
+                    Reject
+                  </Button>
+                </Box>
+              </Box>
+            )}
+
+            {!pendingApprovalLevel && (
+              <Alert severity={approvalStatus === 'approved' ? 'success' : approvalStatus === 'rejected' ? 'error' : 'info'} sx={{ mt: 2 }}>
+                This work order is currently <strong>{approvalStatusLabels[approvalStatus].toLowerCase()}</strong>.
+              </Alert>
+            )}
           </Box>
         )}
       </Box>

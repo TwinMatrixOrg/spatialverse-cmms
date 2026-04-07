@@ -233,6 +233,13 @@ export default function Dashboard() {
         .reduce((entrySum, entry) => entrySum + entry.quantity * entry.unitCost, 0);
       return sum + labourCost + partsCost;
     }, 0);
+  const pendingApprovals = workOrders.filter((workOrder) => {
+    if (selectedSiteId && workOrder.siteId !== selectedSiteId) {
+      return false;
+    }
+
+    return ['pending_supervisor', 'pending_manager'].includes(workOrder.approvalStatus || 'not_required');
+  }).length;
 
   const pieData = [
     { name: 'Open', value: woByStatus.open, color: statusColors.open },
@@ -427,6 +434,7 @@ export default function Dashboard() {
         {[
           { title: 'Open Work Orders', value: kpis.openWorkOrders, icon: <WorkOrderIcon />, color: theme.palette.primary.main },
           { title: 'Overdue WOs', value: kpis.overdueWorkOrders, icon: <WarningIcon />, color: theme.palette.error.main },
+          { title: 'Pending Approvals', value: pendingApprovals, icon: <TimeIcon />, color: '#FB8C00' },
           { title: 'Total Assets', value: kpis.totalAssets, subtitle: `${kpis.criticalAssets} critical`, icon: <AssetIcon />, color: theme.palette.secondary.main },
           { title: 'PM Compliance', value: `${kpis.pmComplianceRate}%`, icon: <CheckIcon />, color: theme.palette.success.main },
           { title: 'MTTR', value: `${kpis.mttr}h`, subtitle: 'Avg repair time', icon: <BuildIcon />, color: theme.palette.info.main },

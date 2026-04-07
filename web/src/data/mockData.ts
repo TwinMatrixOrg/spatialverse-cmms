@@ -2,10 +2,22 @@
 
 export type Priority = 'P1' | 'P2' | 'P3' | 'P4';
 export type WorkOrderStatus = 'open' | 'assigned' | 'in_progress' | 'pending_parts' | 'resolved' | 'closed';
+export type WorkOrderApprovalStatus = 'not_required' | 'pending_supervisor' | 'pending_manager' | 'approved' | 'rejected';
+export type WorkOrderApprovalRole = 'Supervisor' | 'FM Manager';
 export type AssetType = 'HVAC' | 'Electrical' | 'Plumbing' | 'Fire Safety' | 'Elevator' | 'Structural' | 'IT/AV' | 'General';
 export type AssetHealthStatus = 'critical' | 'warning' | 'good';
 export type PMFrequency = 'daily' | 'weekly' | 'bi-weekly' | 'monthly' | 'quarterly' | 'semi-annual' | 'annual';
 export type PMStatus = 'upcoming' | 'overdue' | 'done';
+
+export interface WorkOrderApprovalStep {
+  level: 1 | 2;
+  role: WorkOrderApprovalRole;
+  approverId?: string;
+  approverName?: string;
+  action?: 'approved' | 'rejected';
+  comment?: string;
+  timestamp?: string;
+}
 
 export interface WorkOrderChecklistItem {
   id: string;
@@ -112,6 +124,8 @@ export interface WorkOrder {
   totalLabourCost: number;
   totalPartsCost: number;
   totalCost: number;
+  approvalStatus?: WorkOrderApprovalStatus;
+  approvalChain?: WorkOrderApprovalStep[];
 }
 
 export interface Contractor {
@@ -373,7 +387,79 @@ export const assets: Asset[] = [
 ];
 
 // Work Orders
-const baseWorkOrders: Omit<WorkOrder, 'labourEntries' | 'partsUsed' | 'totalLabourCost' | 'totalPartsCost' | 'totalCost'>[] = [
+const createApprovalChain = (chain?: WorkOrderApprovalStep[]): WorkOrderApprovalStep[] => {
+  const source =
+    chain ||
+    [
+      { level: 1 as const, role: 'Supervisor' as const },
+      { level: 2 as const, role: 'FM Manager' as const },
+    ];
+
+  return source.map((step) => ({ ...step }));
+};
+
+const seededApprovalStates: Record<string, { approvalStatus: WorkOrderApprovalStatus; approvalChain: WorkOrderApprovalStep[] }> = {
+  'wo-1': {
+    approvalStatus: 'pending_supervisor',
+    approvalChain: createApprovalChain(),
+  },
+  'wo-2': {
+    approvalStatus: 'pending_supervisor',
+    approvalChain: createApprovalChain(),
+  },
+  'wo-3': {
+    approvalStatus: 'pending_supervisor',
+    approvalChain: createApprovalChain(),
+  },
+  'wo-4': {
+    approvalStatus: 'pending_supervisor',
+    approvalChain: createApprovalChain(),
+  },
+  'wo-5': {
+    approvalStatus: 'pending_supervisor',
+    approvalChain: createApprovalChain(),
+  },
+  'wo-6': {
+    approvalStatus: 'rejected',
+    approvalChain: createApprovalChain([
+      {
+        level: 1,
+        role: 'Supervisor',
+        approverId: 'user-3',
+        approverName: 'Kumar Suresh',
+        action: 'rejected',
+        comment: 'Insufficient fault details. Please attach supporting diagnostics.',
+        timestamp: subDays(0.7),
+      },
+      { level: 2, role: 'FM Manager' },
+    ]),
+  },
+  'wo-7': {
+    approvalStatus: 'rejected',
+    approvalChain: createApprovalChain([
+      {
+        level: 1,
+        role: 'Supervisor',
+        approverId: 'user-2',
+        approverName: 'Lee Wei Ming',
+        action: 'approved',
+        comment: 'Supervisor approved for manager review.',
+        timestamp: subDays(1.8),
+      },
+      {
+        level: 2,
+        role: 'FM Manager',
+        approverId: 'user-4',
+        approverName: 'Fatimah Abdullah',
+        action: 'rejected',
+        comment: 'Budget hold this week. Re-submit next cycle.',
+        timestamp: subDays(1.6),
+      },
+    ]),
+  },
+};
+
+const baseWorkOrders: Omit<WorkOrder, 'labourEntries' | 'partsUsed' | 'totalLabourCost' | 'totalPartsCost' | 'totalCost' | 'approvalStatus' | 'approvalChain'>[] = [
   // Open Work Orders
   {
     id: 'wo-1', number: 'WO-2024-00001', siteId: 'site-1', assetId: 'asset-2', title: 'AHU-PKL-02 Making Unusual Noise', description: 'Reported unusual grinding noise from AHU-PKL-02. Possible bearing failure.', faultType: 'Mechanical Failure', priority: 'P1', status: 'open', slaDeadline: addHours(4), createdAt: subDays(0.1), updatedAt: subDays(0.1),
@@ -807,6 +893,7 @@ const calculatePartsCost = (entries: WorkOrderPartUsedEntry[]) =>
 
 export const workOrders: WorkOrder[] = baseWorkOrders.map((workOrder) => {
   const seededCost = workOrderCostSeeds[workOrder.id];
+  const seededApproval = seededApprovalStates[workOrder.id];
   const labourEntries = seededCost?.labourEntries || [];
   const partsUsed = seededCost?.partsUsed || [];
   const totalLabourCost = seededCost?.totalLabourCost ?? calculateLabourCost(labourEntries);
@@ -819,6 +906,8 @@ export const workOrders: WorkOrder[] = baseWorkOrders.map((workOrder) => {
     totalLabourCost,
     totalPartsCost,
     totalCost: seededCost?.totalCost ?? totalLabourCost + totalPartsCost,
+    approvalStatus: seededApproval?.approvalStatus || 'not_required',
+    approvalChain: createApprovalChain(seededApproval?.approvalChain),
   };
 });
 

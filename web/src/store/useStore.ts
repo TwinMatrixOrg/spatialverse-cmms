@@ -10,6 +10,8 @@ import {
   Site,
   sites,
   WorkOrder,
+  WorkOrderApprovalStatus,
+  WorkOrderApprovalStep,
   WorkOrderStatus,
   workOrders as seedWorkOrders,
   workOrderStatusLabels,
@@ -73,6 +75,20 @@ interface AppState {
   addWorkOrderComment: (workOrderId: string, message: string, userId?: string) => void;
   addLabourEntry: (workOrderId: string, entry: AddLabourEntryInput) => void;
   addPartsEntry: (workOrderId: string, entry: AddPartsEntryInput) => void;
+  approveWorkOrder: (
+    workOrderId: string,
+    level: 1 | 2,
+    approverId: string,
+    approverName: string,
+    comment?: string
+  ) => void;
+  rejectWorkOrder: (
+    workOrderId: string,
+    level: 1 | 2,
+    approverId: string,
+    approverName: string,
+    comment: string
+  ) => void;
   pmSchedules: PMSchedule[];
   notifications: AppNotification[];
   assetHealthBandFilter: AssetHealthBand;
@@ -118,6 +134,22 @@ const normalizeWorkOrderCosts = (workOrder: WorkOrder): WorkOrder => {
   };
 };
 
+const createDefaultApprovalChain = (): WorkOrderApprovalStep[] => [
+  { level: 1, role: 'Supervisor' },
+  { level: 2, role: 'FM Manager' },
+];
+
+const cloneApprovalChain = (chain?: WorkOrderApprovalStep[]): WorkOrderApprovalStep[] =>
+  (chain && chain.length > 0 ? chain : createDefaultApprovalChain()).map((step) => ({ ...step }));
+
+const getNextApprovalStatusAfterApproval = (level: 1 | 2): WorkOrderApprovalStatus => {
+  if (level === 1) {
+    return 'pending_manager';
+  }
+
+  return 'approved';
+};
+
 const hydratedWorkOrders = seedWorkOrders.map((workOrder) => {
   const asset = getAssetById(workOrder.assetId);
   const reportedById = workOrder.reportedById || 'user-2';
@@ -125,6 +157,8 @@ const hydratedWorkOrders = seedWorkOrders.map((workOrder) => {
   return normalizeWorkOrderCosts({
     ...workOrder,
     reportedById,
+    approvalStatus: workOrder.approvalStatus || 'not_required',
+    approvalChain: cloneApprovalChain(workOrder.approvalChain),
     checklist:
       workOrder.checklist && workOrder.checklist.length > 0
         ? workOrder.checklist
@@ -197,6 +231,8 @@ export const useStore = create<AppState>()(
           slaDeadline: addHours(new Date(), prioritySLAHours[input.priority]).toISOString(),
           createdAt,
           updatedAt: createdAt,
+          approvalStatus: 'not_required',
+          approvalChain: createDefaultApprovalChain(),
           checklist: getChecklistTemplate(input.faultType, asset?.type),
           timeline: [
             {
@@ -422,6 +458,119 @@ export const useStore = create<AppState>()(
           }),
         }));
       },
+      approveWorkOrder: (workOrderId, level, approverId, approverName, comment) => {
+        const trimmedComment = comment?.trim();
+        const timestamp = new Date().toISOString();
+
+        set((state) => ({
+          workOrders: state.workOrders.map((workOrder) => {
+            if (workOrder.id !== workOrderId) {
+              return workOrder;
+            }
+
+            const approvalChain = cloneApprovalChain(workOrder.approvalChain).map((step) =>
+              step.level === level
+                ? {
+                    ...step,
+                    approverId,
+                    approverName,
+                    action: 'approved' as const,
+                    comment: trimmedComment || step.comment,
+                    timestamp,
+                  }
+                : step
+            );
+
+            const nextApprovalStatus = getNextApprovalStatusAfterApproval(level);
+            const timelineEntry = {
+              id: `tl-${workOrder.id}-approval-${timestamp}`,
+              type: 'approval',
+              description:
+                level === 1
+                  ? `Supervisor approval completed by ${approverName}`
+                  : `FM Manager approval completed by ${approverName}`,
+              userId: approverId,
+              createdAt: timestamp,
+            };
+
+            return {
+              ...workOrder,
+              status: level === 2 ? 'assigned' : workOrder.status,
+              approvalStatus: nextApprovalStatus,
+              approvalChain,
+              updatedAt: timestamp,
+              timeline: [...(workOrder.timeline || []), timelineEntry],
+              comments: trimmedComment
+                ? [
+                    ...(workOrder.comments || []),
+                    {
+                      id: `cm-${workOrder.id}-approval-${timestamp}`,
+                      userId: approverId,
+                      message: `Approval note (${approverName}): ${trimmedComment}`,
+                      createdAt: timestamp,
+                    },
+                  ]
+                : workOrder.comments,
+            };
+          }),
+        }));
+      },
+      rejectWorkOrder: (workOrderId, level, approverId, approverName, comment) => {
+        const trimmedComment = comment.trim();
+
+        if (!trimmedComment) {
+          return;
+        }
+
+        const timestamp = new Date().toISOString();
+
+        set((state) => ({
+          workOrders: state.workOrders.map((workOrder) => {
+            if (workOrder.id !== workOrderId) {
+              return workOrder;
+            }
+
+            const approvalChain = cloneApprovalChain(workOrder.approvalChain).map((step) =>
+              step.level === level
+                ? {
+                    ...step,
+                    approverId,
+                    approverName,
+                    action: 'rejected' as const,
+                    comment: trimmedComment,
+                    timestamp,
+                  }
+                : step
+            );
+
+            return {
+              ...workOrder,
+              approvalStatus: 'rejected',
+              approvalChain,
+              updatedAt: timestamp,
+              timeline: [
+                ...(workOrder.timeline || []),
+                {
+                  id: `tl-${workOrder.id}-rejection-${timestamp}`,
+                  type: 'approval',
+                  description: `Approval rejected by ${approverName}`,
+                  userId: approverId,
+                  createdAt: timestamp,
+                },
+              ],
+              comments: [
+                ...(workOrder.comments || []),
+                {
+                  id: `cm-${workOrder.id}-rejection-${timestamp}`,
+                  userId: approverId,
+                  message: `Rejection reason (${approverName}): ${trimmedComment}`,
+                  createdAt: timestamp,
+                },
+              ],
+            };
+          }),
+        }));
+      },
       generateWOFromPMSchedule: (pmSchedule) => {
         const currentWorkOrders = get().workOrders;
         const now = new Date();
@@ -448,6 +597,8 @@ export const useStore = create<AppState>()(
           faultType: 'Preventive Maintenance',
           priority: 'P3',
           status: 'open',
+          approvalStatus: 'not_required',
+          approvalChain: createDefaultApprovalChain(),
           slaDeadline: new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000).toISOString(),
           createdAt: now.toISOString(),
           updatedAt: now.toISOString(),
