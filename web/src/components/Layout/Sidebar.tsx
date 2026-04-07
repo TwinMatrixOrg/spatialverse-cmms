@@ -90,35 +90,52 @@ export default function Sidebar({ open, onClose, drawerWidth, collapsedWidth, is
           minHeight: 64,
         }}
       >
-        {open || isMobile ? (
-          /* Expanded: show full logo image */
-          <Box
-            component="img"
-            src="/cmms/sv-pulse-logo.jpg"
-            alt="SpatialVerse Pulse"
-            sx={{
-              height: 40,
-              maxWidth: 200,
-              objectFit: 'contain',
-              objectPosition: 'left center',
-              borderRadius: 1,
-            }}
-          />
-        ) : (
-          /* Collapsed: show icon-only box */
-          <Box
-            sx={{
-              width: 36,
-              height: 36,
-              borderRadius: 2,
-              background: 'linear-gradient(135deg, #00BCD4 0%, #0A1628 100%)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <Typography variant="h6" sx={{ color: 'white', fontWeight: 700, fontSize: '1rem' }}>
-              SP
+        {/* Logo icon mark */}
+        <Box
+          sx={{
+            width: 32,
+            height: 32,
+            borderRadius: '8px',
+            background: 'linear-gradient(135deg, #00BCD4 30%, #0077A8 100%)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+            mr: open || isMobile ? 1.5 : 0,
+          }}
+        >
+          {/* Hex + pulse SVG icon */}
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <polygon points="10,1 17,5 17,13 10,17 3,13 3,5" fill="none" stroke="white" strokeWidth="1.5"/>
+            <polyline points="3,9 6,9 7.5,6 10,12 12.5,7 14,9 17,9" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+          </svg>
+        </Box>
+
+        {(open || isMobile) && (
+          <Box sx={{ minWidth: 0 }}>
+            <Typography
+              variant="subtitle1"
+              sx={{
+                fontWeight: 700,
+                color: 'white',
+                lineHeight: 1.1,
+                fontSize: '0.9rem',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              SpatialVerse Pulse
+            </Typography>
+            <Typography
+              variant="caption"
+              sx={{
+                color: '#00BCD4',
+                fontSize: '0.6rem',
+                letterSpacing: '0.12em',
+                fontWeight: 600,
+                textTransform: 'uppercase',
+              }}
+            >
+              Spatial FM Platform
             </Typography>
           </Box>
         )}
