@@ -23,6 +23,7 @@ import {
   LinearProgress,
   List,
   ListItem,
+  ListItemAvatar,
   ListItemText,
   MenuItem,
   Paper,
@@ -50,8 +51,11 @@ import {
   CheckCircle as CheckIcon,
   Circle as CircleIcon,
   Close as CloseIcon,
+  EmailOutlined as EmailIcon,
   Search as SearchIcon,
   Send as SendIcon,
+  SettingsSuggest as SystemIcon,
+  SmsOutlined as SmsIcon,
   ViewKanban as KanbanIcon,
   ViewList as ListIcon,
 } from '@mui/icons-material';
@@ -157,6 +161,7 @@ function WOCard({ wo, now, onClick }: { wo: WorkOrder; now: Date; onClick: () =>
   const assignee = wo.assignedToId ? getUserById(wo.assignedToId) : null;
   const { timeLeft, isOverdue } = getSLAState(wo.createdAt, wo.slaDeadline, now);
   const showSLA = !['resolved', 'closed'].includes(wo.status);
+  const isBreached = wo.slaBreached && showSLA;
 
   return (
     <Card
@@ -164,10 +169,12 @@ function WOCard({ wo, now, onClick }: { wo: WorkOrder; now: Date; onClick: () =>
       sx={{
         mb: 1.5,
         cursor: 'pointer',
-        borderLeft: `4px solid ${priorityColors[wo.priority]}`,
+        borderLeft: `4px solid ${isBreached ? '#EF5350' : priorityColors[wo.priority]}`,
+        backgroundColor: isBreached ? alpha('#EF5350', 0.06) : undefined,
         '&:hover': {
           boxShadow: theme.shadows[4],
           transform: 'translateY(-2px)',
+          backgroundColor: isBreached ? alpha('#EF5350', 0.1) : undefined,
         },
         transition: 'all 0.2s ease',
       }}
@@ -177,17 +184,32 @@ function WOCard({ wo, now, onClick }: { wo: WorkOrder; now: Date; onClick: () =>
           <Typography variant="body2" fontWeight={600}>
             {formatWONumber(wo.number)}
           </Typography>
-          <Chip
-            size="small"
-            label={wo.priority}
-            sx={{
-              backgroundColor: alpha(priorityColors[wo.priority], 0.15),
-              color: priorityColors[wo.priority],
-              fontWeight: 700,
-              fontSize: '0.7rem',
-              height: 22,
-            }}
-          />
+          <Box sx={{ display: 'flex', gap: 0.75, alignItems: 'center' }}>
+            {isBreached && (
+              <Chip
+                size="small"
+                label="SLA BREACHED"
+                sx={{
+                  backgroundColor: alpha('#EF5350', 0.15),
+                  color: '#EF5350',
+                  fontWeight: 700,
+                  fontSize: '0.63rem',
+                  height: 22,
+                }}
+              />
+            )}
+            <Chip
+              size="small"
+              label={wo.priority}
+              sx={{
+                backgroundColor: alpha(priorityColors[wo.priority], 0.15),
+                color: priorityColors[wo.priority],
+                fontWeight: 700,
+                fontSize: '0.7rem',
+                height: 22,
+              }}
+            />
+          </Box>
         </Box>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 1, fontSize: '0.8rem' }}>
           {asset?.name}
@@ -335,6 +357,7 @@ export default function WorkOrders() {
   const [viewMode, setViewMode] = useState<'kanban' | 'list'>('kanban');
   const [searchQuery, setSearchQuery] = useState('');
   const [priorityFilter, setPriorityFilter] = useState<Priority | 'all'>('all');
+  const [slaFilter, setSlaFilter] = useState<'all' | 'breached'>('all');
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [selectedWOId, setSelectedWOId] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -366,6 +389,7 @@ export default function WorkOrders() {
     return workOrders.filter((workOrder) => {
       if (selectedSiteId && workOrder.siteId !== selectedSiteId) return false;
       if (priorityFilter !== 'all' && workOrder.priority !== priorityFilter) return false;
+      if (slaFilter === 'breached' && !workOrder.slaBreached) return false;
       if (searchQuery) {
         const search = searchQuery.toLowerCase();
         const asset = getAssetById(workOrder.assetId);
@@ -377,7 +401,7 @@ export default function WorkOrders() {
       }
       return true;
     });
-  }, [priorityFilter, searchQuery, selectedSiteId, workOrders]);
+  }, [priorityFilter, searchQuery, selectedSiteId, slaFilter, workOrders]);
 
   const wosByStatus = useMemo(() => {
     const grouped: Record<WorkOrderStatus, WorkOrder[]> = {
@@ -466,6 +490,14 @@ export default function WorkOrders() {
             <MenuItem value="P4">P4</MenuItem>
           </Select>
         </FormControl>
+        <Tabs
+          value={slaFilter}
+          onChange={(_, value: 'all' | 'breached') => setSlaFilter(value)}
+          sx={{ minHeight: 36 }}
+        >
+          <Tab label="All" value="all" sx={{ minHeight: 36, minWidth: 72 }} />
+          <Tab label="SLA Breached" value="breached" sx={{ minHeight: 36, minWidth: 120 }} />
+        </Tabs>
         <Chip label={`${filteredWOs.length} work orders`} sx={{ alignSelf: 'center' }} />
         <Box sx={{ flexGrow: 1 }} />
         <ToggleButtonGroup
@@ -526,18 +558,41 @@ export default function WorkOrders() {
                 const assignee = workOrder.assignedToId ? getUserById(workOrder.assignedToId) : null;
                 const site = getSiteById(workOrder.siteId);
                 const showSLA = !['resolved', 'closed'].includes(workOrder.status);
+                const isBreached = workOrder.slaBreached && showSLA;
 
                 return (
                   <TableRow
                     key={workOrder.id}
                     hover
                     onClick={() => setSelectedWOId(workOrder.id)}
-                    sx={{ cursor: 'pointer' }}
+                    sx={{
+                      cursor: 'pointer',
+                      borderLeft: `4px solid ${isBreached ? '#EF5350' : 'transparent'}`,
+                      backgroundColor: isBreached ? alpha('#EF5350', 0.06) : undefined,
+                      '&:hover': {
+                        backgroundColor: isBreached ? alpha('#EF5350', 0.12) : undefined,
+                      },
+                    }}
                   >
                     <TableCell>
-                      <Typography variant="body2" fontWeight={600}>
-                        {formatWONumber(workOrder.number)}
-                      </Typography>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                        <Typography variant="body2" fontWeight={600}>
+                          {formatWONumber(workOrder.number)}
+                        </Typography>
+                        {isBreached && (
+                          <Chip
+                            size="small"
+                            label="SLA BREACHED"
+                            sx={{
+                              backgroundColor: alpha('#EF5350', 0.15),
+                              color: '#EF5350',
+                              fontWeight: 700,
+                              fontSize: '0.63rem',
+                              height: 20,
+                            }}
+                          />
+                        )}
+                      </Box>
                     </TableCell>
                     <TableCell>{asset?.name}</TableCell>
                     <TableCell>{workOrder.faultType}</TableCell>
@@ -634,6 +689,16 @@ function SLAChip({ createdAt, deadline, now }: { createdAt: string; deadline: st
       }}
     />
   );
+}
+
+function EscalationMethodIcon({ method }: { method: 'system' | 'email' | 'sms' }) {
+  if (method === 'email') {
+    return <EmailIcon sx={{ fontSize: 16 }} />;
+  }
+  if (method === 'sms') {
+    return <SmsIcon sx={{ fontSize: 16 }} />;
+  }
+  return <SystemIcon sx={{ fontSize: 16 }} />;
 }
 
 function WODetailPanel({
@@ -855,24 +920,58 @@ function WODetailPanel({
         </Tabs>
 
         {activeTab === 0 && (
-          <List dense sx={{ mt: 1 }}>
-            {timelineEntries.map((entry) => {
-              const user = getUserById(entry.userId);
+          <Box sx={{ mt: 1 }}>
+            <List dense>
+              {timelineEntries.map((entry) => {
+                const user = getUserById(entry.userId);
 
-              return (
-                <ListItem key={entry.id} sx={{ px: 0 }}>
+                return (
+                  <ListItem key={entry.id} sx={{ px: 0 }}>
+                    <ListItemText
+                      primary={
+                        <Typography variant="body2" fontWeight={600}>
+                          {entry.description}
+                        </Typography>
+                      }
+                      secondary={`${user ? `${user.firstName} ${user.lastName}` : 'System'} • ${format(new Date(entry.createdAt), 'MMM d, HH:mm')}`}
+                    />
+                  </ListItem>
+                );
+              })}
+            </List>
+
+            <Typography variant="subtitle2" fontWeight={700} sx={{ mt: 1.5, mb: 0.5 }}>
+              Escalation Log
+            </Typography>
+            <List dense>
+              {wo.escalationLog.length === 0 && (
+                <ListItem sx={{ px: 0 }}>
+                  <ListItemText
+                    primary={
+                      <Typography variant="body2" color="text.secondary">
+                        No escalation entries
+                      </Typography>
+                    }
+                  />
+                </ListItem>
+              )}
+              {wo.escalationLog.map((entry, index) => (
+                <ListItem key={`${entry.timestamp}-${index}`} sx={{ px: 0 }}>
+                  <ListItemAvatar sx={{ minWidth: 30, color: 'error.main' }}>
+                    <EscalationMethodIcon method={entry.method} />
+                  </ListItemAvatar>
                   <ListItemText
                     primary={
                       <Typography variant="body2" fontWeight={600}>
-                        {entry.description}
+                        {entry.notifiedRole} • {entry.notifiedName}
                       </Typography>
                     }
-                    secondary={`${user ? `${user.firstName} ${user.lastName}` : 'System'} • ${format(new Date(entry.createdAt), 'MMM d, HH:mm')}`}
+                    secondary={`${entry.method.toUpperCase()} • ${format(new Date(entry.timestamp), 'MMM d, HH:mm')}`}
                   />
                 </ListItem>
-              );
-            })}
-          </List>
+              ))}
+            </List>
+          </Box>
         )}
 
         {activeTab === 1 && (

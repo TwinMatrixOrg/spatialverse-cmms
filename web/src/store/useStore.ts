@@ -54,6 +54,7 @@ interface AppState {
   addWorkOrderComment: (workOrderId: string, message: string, userId?: string) => void;
   pmSchedules: PMSchedule[];
   notifications: AppNotification[];
+  checkAndEscalateSlaBreaches: () => void;
   assetHealthBandFilter: AssetHealthBand;
   setAssetHealthBandFilter: (band: AssetHealthBand) => void;
   generateWOFromPMSchedule: (pmSchedule: PMSchedule) => WorkOrder;
@@ -72,6 +73,8 @@ const hydratedWorkOrders = seedWorkOrders.map((workOrder) => {
 
   return {
     ...workOrder,
+    slaBreached: workOrder.slaBreached ?? false,
+    escalationLog: workOrder.escalationLog ?? [],
     reportedById,
     checklist:
       workOrder.checklist && workOrder.checklist.length > 0
@@ -118,6 +121,38 @@ export const useStore = create<AppState>()(
       nextWorkOrderSequence: initialSequence,
       pmSchedules: initialPMSchedules,
       notifications: initialNotifications,
+      checkAndEscalateSlaBreaches: () => {
+        const timestamp = new Date().toISOString();
+        const activeStatuses: WorkOrderStatus[] = ['open', 'assigned', 'in_progress', 'pending_parts'];
+
+        set((state) => ({
+          workOrders: state.workOrders.map((workOrder) => {
+            const isActive = activeStatuses.includes(workOrder.status);
+            const isOverdue = new Date(workOrder.slaDeadline).getTime() < Date.now();
+
+            if (!isActive || !isOverdue || workOrder.slaBreached) {
+              return workOrder;
+            }
+
+            return {
+              ...workOrder,
+              slaBreached: true,
+              slaBreachTime: timestamp,
+              updatedAt: timestamp,
+              escalationLog: [
+                ...(workOrder.escalationLog || []),
+                {
+                  timestamp,
+                  notifiedRole: 'Supervisor',
+                  notifiedName: 'Control Room Supervisor',
+                  method: 'system',
+                  message: `Auto-escalation: ${workOrder.number} exceeded SLA deadline.`,
+                },
+              ],
+            };
+          }),
+        }));
+      },
       assetHealthBandFilter: 'all',
       setAssetHealthBandFilter: (band) => set({ assetHealthBandFilter: band }),
       createWorkOrder: (input) => {
@@ -143,6 +178,8 @@ export const useStore = create<AppState>()(
           reportedById,
           estimatedHours: input.estimatedHours,
           slaDeadline: addHours(new Date(), prioritySLAHours[input.priority]).toISOString(),
+          slaBreached: false,
+          escalationLog: [],
           createdAt,
           updatedAt: createdAt,
           checklist: getChecklistTemplate(input.faultType, asset?.type),
@@ -309,6 +346,8 @@ export const useStore = create<AppState>()(
           priority: 'P3',
           status: 'open',
           slaDeadline: new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000).toISOString(),
+          slaBreached: false,
+          escalationLog: [],
           createdAt: now.toISOString(),
           updatedAt: now.toISOString(),
           checklist: pmSchedule.checklist.map((item, index) => ({
@@ -360,6 +399,9 @@ export const useStore = create<AppState>()(
     {
       name: 'sv-pulse-store',
       storage: createJSONStorage(() => localStorage),
+      onRehydrateStorage: () => (state) => {
+        state?.checkAndEscalateSlaBreaches();
+      },
       partialize: (state) => ({
         workOrders: state.workOrders,
         nextWorkOrderSequence: state.nextWorkOrderSequence,
@@ -367,3 +409,5 @@ export const useStore = create<AppState>()(
     }
   )
 );
+
+useStore.getState().checkAndEscalateSlaBreaches();
