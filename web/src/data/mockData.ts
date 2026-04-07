@@ -7,6 +7,27 @@ export type AssetHealthStatus = 'critical' | 'warning' | 'good';
 export type PMFrequency = 'daily' | 'weekly' | 'bi-weekly' | 'monthly' | 'quarterly' | 'semi-annual' | 'annual';
 export type PMStatus = 'upcoming' | 'overdue' | 'done';
 
+export interface WorkOrderChecklistItem {
+  id: string;
+  text: string;
+  completed: boolean;
+}
+
+export interface WorkOrderTimelineEntry {
+  id: string;
+  type: string;
+  description: string;
+  userId: string;
+  createdAt: string;
+}
+
+export interface WorkOrderComment {
+  id: string;
+  userId: string;
+  message: string;
+  createdAt: string;
+}
+
 export interface Site {
   id: string;
   name: string;
@@ -56,14 +77,17 @@ export interface WorkOrder {
   priority: Priority;
   status: WorkOrderStatus;
   assignedToId?: string;
+  reportedById?: string;
   contractorId?: string;
+  estimatedHours?: number;
   slaDeadline: string;
   createdAt: string;
   updatedAt: string;
   resolvedAt?: string;
   closedAt?: string;
-  checklist?: { id: string; text: string; completed: boolean }[];
-  timeline?: { id: string; type: string; description: string; userId: string; createdAt: string }[];
+  checklist?: WorkOrderChecklistItem[];
+  timeline?: WorkOrderTimelineEntry[];
+  comments?: WorkOrderComment[];
 }
 
 export interface Contractor {
@@ -167,6 +191,61 @@ export const users: User[] = [
   { id: 'user-6', email: 'raj@twinmatrix.com', firstName: 'Raj', lastName: 'Krishnan', role: 'technician', siteIds: ['site-1', 'site-3'] },
   { id: 'user-7', email: 'mei@twinmatrix.com', firstName: 'Mei', lastName: 'Ling', role: 'technician', siteIds: ['site-2', 'site-3'] },
   { id: 'user-8', email: 'zain@twinmatrix.com', firstName: 'Zain', lastName: 'Hassan', role: 'technician', siteIds: ['site-1'] },
+];
+
+export const technicians = users.filter((user) => user.role === 'technician');
+
+export const workOrderFaultTypes = [
+  'Mechanical',
+  'Electrical',
+  'Plumbing',
+  'Fire Safety',
+  'HVAC',
+  'IT/AV',
+  'Structural',
+  'Other',
+] as const;
+
+export const prioritySLAHours: Record<Priority, number> = {
+  P1: 4,
+  P2: 8,
+  P3: 24,
+  P4: 72,
+};
+
+export const workOrderStatusLabels: Record<WorkOrderStatus, string> = {
+  open: 'Open',
+  assigned: 'Assigned',
+  in_progress: 'In Progress',
+  pending_parts: 'Pending Parts',
+  resolved: 'Resolved',
+  closed: 'Closed',
+};
+
+export const nextStatusMap: Record<WorkOrderStatus, WorkOrderStatus[]> = {
+  open: ['assigned', 'in_progress', 'resolved'],
+  assigned: ['in_progress', 'pending_parts', 'resolved'],
+  in_progress: ['pending_parts', 'resolved'],
+  pending_parts: ['assigned', 'in_progress', 'resolved'],
+  resolved: ['closed'],
+  closed: [],
+};
+
+const checklistTemplatesByType: Record<string, string[]> = {
+  HVAC: ['Check refrigerant levels', 'Inspect filters', 'Test airflow', 'Check electrical connections', 'Log readings'],
+  Mechanical: ['Inspect moving components', 'Verify alignment', 'Check lubrication points', 'Tighten mounting hardware', 'Log vibration readings'],
+  Electrical: ['Lockout/tagout verification', 'Inspect breakers and relays', 'Check insulation resistance', 'Test voltage under load', 'Record measurements'],
+  Plumbing: ['Check for visible leaks', 'Inspect valves and joints', 'Verify pressure levels', 'Flush and clean strainers', 'Log flow readings'],
+  'Fire Safety': ['Check alarm panel status', 'Inspect detectors', 'Test audible/visual alarms', 'Verify pump pressure', 'Document compliance checklist'],
+  'IT/AV': ['Check network connectivity', 'Inspect cable terminations', 'Validate device firmware', 'Run system diagnostics', 'Capture incident notes'],
+  Structural: ['Inspect visible cracks', 'Check anchor points', 'Assess corrosion areas', 'Verify load-bearing condition', 'Photograph and log findings'],
+  Other: ['Visual inspection', 'Functional check', 'Safety verification', 'Rectification action', 'Complete service notes'],
+};
+
+const defaultCommentTemplates = [
+  { userId: 'user-2', message: 'Initial assessment completed. Monitoring for updates.' },
+  { userId: 'user-5', message: 'Technician acknowledged and preparing required tools.' },
+  { userId: 'user-3', message: 'Site operations notified. Access coordinated.' },
 ];
 
 // Helper to generate dates
@@ -621,6 +700,24 @@ export const notifications: AppNotification[] = [
     severity: 'warning',
   },
 ];
+
+export const getChecklistTemplate = (faultType: string, assetType?: AssetType): WorkOrderChecklistItem[] => {
+  const template = checklistTemplatesByType[faultType] || (assetType ? checklistTemplatesByType[assetType] : undefined) || checklistTemplatesByType.Other;
+  return template.map((text, index) => ({
+    id: `cl-${faultType.toLowerCase().replace(/\s+/g, '-')}-${index + 1}`,
+    text,
+    completed: false,
+  }));
+};
+
+export const getDefaultWorkOrderComments = (workOrderId: string): WorkOrderComment[] => {
+  return defaultCommentTemplates.map((template, index) => ({
+    id: `cm-${workOrderId}-${index + 1}`,
+    userId: template.userId,
+    message: template.message,
+    createdAt: subDays(0.9 - index * 0.15),
+  }));
+};
 
 // Helper functions
 export const getAssetById = (id: string) => assets.find(a => a.id === id);
