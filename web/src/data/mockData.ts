@@ -78,6 +78,14 @@ export interface AssetFailureEvent {
   downtimeHours: number;
 }
 
+export interface WorkOrderEscalationEntry {
+  timestamp: string;
+  notifiedRole: 'Supervisor' | 'FM Manager' | 'Director';
+  notifiedName: string;
+  method: 'system' | 'email' | 'sms';
+  message: string;
+}
+
 export interface Site {
   id: string;
   name: string;
@@ -133,6 +141,9 @@ export interface WorkOrder {
   contractorId?: string;
   estimatedHours?: number;
   slaDeadline: string;
+  slaBreached: boolean;
+  slaBreachTime?: string;
+  escalationLog: WorkOrderEscalationEntry[];
   createdAt: string;
   updatedAt: string;
   resolvedAt?: string;
@@ -706,31 +717,51 @@ const seededApprovalStates: Record<string, { approvalStatus: WorkOrderApprovalSt
   },
 };
 
-const baseWorkOrders: Omit<WorkOrder, 'labourEntries' | 'partsUsed' | 'totalLabourCost' | 'totalPartsCost' | 'totalCost' | 'approvalStatus' | 'approvalChain'>[] = [
+const seededWorkOrders: Array<
+  Omit<WorkOrder, 'labourEntries' | 'partsUsed' | 'totalLabourCost' | 'totalPartsCost' | 'totalCost' | 'approvalStatus' | 'approvalChain' | 'slaBreached' | 'escalationLog'> &
+  Partial<Pick<WorkOrder, 'slaBreached' | 'slaBreachTime' | 'escalationLog'>>
+> = [
   // Open Work Orders
   {
     id: 'wo-1', number: 'WO-2024-00001', siteId: 'site-1', assetId: 'asset-2', title: 'AHU-PKL-02 Making Unusual Noise', description: 'Reported unusual grinding noise from AHU-PKL-02. Possible bearing failure.', faultType: 'Mechanical Failure', priority: 'P1', status: 'open', slaDeadline: addHours(4), createdAt: subDays(0.1), updatedAt: subDays(0.1),
     timeline: [{ id: 'tl-1', type: 'created', description: 'Work order created', userId: 'user-2', createdAt: subDays(0.1) }]
   },
   {
-    id: 'wo-2', number: 'WO-2024-00002', siteId: 'site-3', assetId: 'asset-37', title: 'MDB-MV-02 Overheating Alert', description: 'BMS triggered overheating alert on MDB-MV-02. Thermal imaging required.', faultType: 'Electrical Fault', priority: 'P1', status: 'open', slaDeadline: addHours(2), createdAt: subDays(0.05), updatedAt: subDays(0.05),
+    id: 'wo-2', number: 'WO-2024-00002', siteId: 'site-3', assetId: 'asset-37', title: 'MDB-MV-02 Overheating Alert', description: 'BMS triggered overheating alert on MDB-MV-02. Thermal imaging required.', faultType: 'Electrical Fault', priority: 'P1', status: 'open', slaDeadline: addHours(-3), slaBreached: true, slaBreachTime: addHours(-3), createdAt: subDays(0.05), updatedAt: subDays(0.05),
+    escalationLog: [
+      { timestamp: addHours(-2.8), notifiedRole: 'Supervisor', notifiedName: 'Nur Aisyah Ismail', method: 'system', message: 'P1 WO exceeded SLA. Immediate dispatch confirmation required.' },
+      { timestamp: addHours(-2.3), notifiedRole: 'FM Manager', notifiedName: 'Daniel Tan', method: 'email', message: 'Escalated: MDB overheating unresolved after SLA breach threshold.' },
+      { timestamp: addHours(-1.6), notifiedRole: 'Director', notifiedName: 'Priya Menon', method: 'sms', message: 'Critical SLA breach on WO-2024-00002. Executive visibility enabled.' },
+    ],
     timeline: [{ id: 'tl-2', type: 'created', description: 'Work order created via BMS alert', userId: 'user-1', createdAt: subDays(0.05) }]
   },
   {
-    id: 'wo-3', number: 'WO-2024-00003', siteId: 'site-2', assetId: 'asset-20', title: 'Chiller-SP-02 Low Refrigerant', description: 'Chiller showing low refrigerant pressure. Suspected leak in system.', faultType: 'Refrigerant Leak', priority: 'P2', status: 'open', slaDeadline: addHours(8), createdAt: subDays(0.2), updatedAt: subDays(0.2),
+    id: 'wo-3', number: 'WO-2024-00003', siteId: 'site-2', assetId: 'asset-20', title: 'Chiller-SP-02 Low Refrigerant', description: 'Chiller showing low refrigerant pressure. Suspected leak in system.', faultType: 'Refrigerant Leak', priority: 'P2', status: 'open', slaDeadline: addHours(-10), slaBreached: true, slaBreachTime: addHours(-10), createdAt: subDays(0.2), updatedAt: subDays(0.2),
+    escalationLog: [
+      { timestamp: addHours(-9.7), notifiedRole: 'Supervisor', notifiedName: 'Farid Rahman', method: 'system', message: 'P2 refrigerant leak WO breached SLA. Site attendance overdue.' },
+      { timestamp: addHours(-8.9), notifiedRole: 'FM Manager', notifiedName: 'Kavitha Nair', method: 'email', message: 'Escalation reminder sent for overdue chiller refrigerant issue.' },
+    ],
     timeline: [{ id: 'tl-3', type: 'created', description: 'Work order created', userId: 'user-3', createdAt: subDays(0.2) }]
   },
 
   // Assigned Work Orders
   {
-    id: 'wo-4', number: 'WO-2024-00004', siteId: 'site-1', assetId: 'asset-7', title: 'UPS Battery Replacement', description: 'UPS batteries are past end of life. Replacement required.', faultType: 'Battery Failure', priority: 'P2', status: 'assigned', assignedToId: 'user-5', slaDeadline: addHours(24), createdAt: subDays(0.5), updatedAt: subDays(0.3),
+    id: 'wo-4', number: 'WO-2024-00004', siteId: 'site-1', assetId: 'asset-7', title: 'UPS Battery Replacement', description: 'UPS batteries are past end of life. Replacement required.', faultType: 'Battery Failure', priority: 'P2', status: 'assigned', assignedToId: 'user-5', slaDeadline: addHours(-6), slaBreached: true, slaBreachTime: addHours(-6), createdAt: subDays(0.5), updatedAt: subDays(0.3),
+    escalationLog: [
+      { timestamp: addHours(-5.5), notifiedRole: 'Supervisor', notifiedName: 'Nur Aisyah Ismail', method: 'system', message: 'Assigned WO breached SLA. UPS resilience risk elevated.' },
+      { timestamp: addHours(-4.4), notifiedRole: 'FM Manager', notifiedName: 'Daniel Tan', method: 'email', message: 'Follow-up: UPS replacement pending beyond SLA commitment.' },
+    ],
     timeline: [
       { id: 'tl-4', type: 'created', description: 'Work order created', userId: 'user-2', createdAt: subDays(0.5) },
       { id: 'tl-5', type: 'assigned', description: 'Assigned to Wong Chun Kit', userId: 'user-2', createdAt: subDays(0.3) }
     ]
   },
   {
-    id: 'wo-5', number: 'WO-2024-00005', siteId: 'site-3', assetId: 'asset-42', title: 'Cargo Elevator Door Malfunction', description: 'Cargo elevator door not closing properly. Safety sensor may need adjustment.', faultType: 'Door Mechanism', priority: 'P2', status: 'assigned', assignedToId: 'user-6', contractorId: 'contractor-3', slaDeadline: addHours(12), createdAt: subDays(0.4), updatedAt: subDays(0.2),
+    id: 'wo-5', number: 'WO-2024-00005', siteId: 'site-3', assetId: 'asset-42', title: 'Cargo Elevator Door Malfunction', description: 'Cargo elevator door not closing properly. Safety sensor may need adjustment.', faultType: 'Door Mechanism', priority: 'P2', status: 'assigned', assignedToId: 'user-6', contractorId: 'contractor-3', slaDeadline: addHours(-2), slaBreached: true, slaBreachTime: addHours(-2), createdAt: subDays(0.4), updatedAt: subDays(0.2),
+    escalationLog: [
+      { timestamp: addHours(-1.8), notifiedRole: 'Supervisor', notifiedName: 'Farid Rahman', method: 'system', message: 'Elevator safety-related WO exceeded SLA window.' },
+      { timestamp: addHours(-1.2), notifiedRole: 'FM Manager', notifiedName: 'Kavitha Nair', method: 'sms', message: 'Contractor follow-up required for breached cargo elevator WO.' },
+    ],
     timeline: [
       { id: 'tl-6', type: 'created', description: 'Work order created', userId: 'user-4', createdAt: subDays(0.4) },
       { id: 'tl-7', type: 'assigned', description: 'Assigned to Fujitec contractor', userId: 'user-4', createdAt: subDays(0.2) }
@@ -762,7 +793,12 @@ const baseWorkOrders: Omit<WorkOrder, 'labourEntries' | 'partsUsed' | 'totalLabo
     ]
   },
   {
-    id: 'wo-8', number: 'WO-2024-00008', siteId: 'site-1', assetId: 'asset-9', title: 'Lift-PKL-02 Leveling Issue', description: 'Elevator not leveling correctly at some floors.', faultType: 'Control System', priority: 'P2', status: 'in_progress', assignedToId: 'user-8', contractorId: 'contractor-3', slaDeadline: addHours(16), createdAt: subDays(0.8), updatedAt: subDays(0.2),
+    id: 'wo-8', number: 'WO-2024-00008', siteId: 'site-1', assetId: 'asset-9', title: 'Lift-PKL-02 Leveling Issue', description: 'Elevator not leveling correctly at some floors.', faultType: 'Control System', priority: 'P2', status: 'in_progress', assignedToId: 'user-8', contractorId: 'contractor-3', slaDeadline: addHours(-5), slaBreached: true, slaBreachTime: addHours(-5), createdAt: subDays(0.8), updatedAt: subDays(0.2),
+    escalationLog: [
+      { timestamp: addHours(-4.8), notifiedRole: 'Supervisor', notifiedName: 'Nur Aisyah Ismail', method: 'system', message: 'Lift leveling fault remains unresolved after SLA deadline.' },
+      { timestamp: addHours(-3.6), notifiedRole: 'FM Manager', notifiedName: 'Daniel Tan', method: 'email', message: 'Escalation triggered for passenger lift SLA breach in main lobby.' },
+      { timestamp: addHours(-2.4), notifiedRole: 'Director', notifiedName: 'Priya Menon', method: 'sms', message: 'High-visibility elevator SLA breach still active at Pavilion KL.' },
+    ],
     timeline: [
       { id: 'tl-13', type: 'created', description: 'Work order created', userId: 'user-2', createdAt: subDays(0.8) },
       { id: 'tl-14', type: 'assigned', description: 'Assigned to KONE technician', userId: 'user-2', createdAt: subDays(0.6) },
@@ -839,7 +875,10 @@ const baseWorkOrders: Omit<WorkOrder, 'labourEntries' | 'partsUsed' | 'totalLabo
 
   // More recent work orders for variety
   {
-    id: 'wo-19', number: 'WO-2024-00019', siteId: 'site-1', assetId: 'asset-2', title: 'AHU-PKL-02 Emergency Repair', description: 'Bearing failure confirmed. Emergency repair in progress.', faultType: 'Bearing Failure', priority: 'P1', status: 'in_progress', assignedToId: 'user-5', contractorId: 'contractor-1', slaDeadline: addHours(6), createdAt: subDays(0.15), updatedAt: subDays(0.08),
+    id: 'wo-19', number: 'WO-2024-00019', siteId: 'site-1', assetId: 'asset-2', title: 'AHU-PKL-02 Emergency Repair', description: 'Bearing failure confirmed. Emergency repair in progress.', faultType: 'Bearing Failure', priority: 'P1', status: 'in_progress', assignedToId: 'user-5', contractorId: 'contractor-1', slaDeadline: addHours(-1), slaBreached: true, slaBreachTime: addHours(-1), createdAt: subDays(0.15), updatedAt: subDays(0.08),
+    escalationLog: [
+      { timestamp: addHours(-0.9), notifiedRole: 'Supervisor', notifiedName: 'Farid Rahman', method: 'system', message: 'Emergency AHU repair has breached SLA by 1 hour.' },
+    ],
     timeline: [
       { id: 'tl-33', type: 'created', description: 'Emergency work order created', userId: 'user-2', createdAt: subDays(0.15) },
       { id: 'tl-34', type: 'assigned', description: 'Daikin emergency team dispatched', userId: 'user-2', createdAt: subDays(0.12) },
@@ -1138,7 +1177,7 @@ const calculateLabourCost = (entries: WorkOrderLabourEntry[]) =>
 const calculatePartsCost = (entries: WorkOrderPartUsedEntry[]) =>
   entries.reduce((sum, entry) => sum + entry.quantity * entry.unitCost, 0);
 
-export const workOrders: WorkOrder[] = baseWorkOrders.map((workOrder) => {
+export const workOrders: WorkOrder[] = seededWorkOrders.map((workOrder) => {
   const seededCost = workOrderCostSeeds[workOrder.id];
   const seededApproval = seededApprovalStates[workOrder.id];
   const labourEntries = seededCost?.labourEntries || [];
@@ -1155,6 +1194,8 @@ export const workOrders: WorkOrder[] = baseWorkOrders.map((workOrder) => {
     totalCost: seededCost?.totalCost ?? totalLabourCost + totalPartsCost,
     approvalStatus: seededApproval?.approvalStatus || 'not_required',
     approvalChain: createApprovalChain(seededApproval?.approvalChain),
+    slaBreached: workOrder.slaBreached ?? false,
+    escalationLog: workOrder.escalationLog ?? [],
   };
 });
 
