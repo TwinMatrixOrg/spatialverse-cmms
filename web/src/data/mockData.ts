@@ -12,6 +12,13 @@ export type PermitType = 'hot_work' | 'confined_space' | 'electrical_isolation' 
 export type PermitStatus = 'draft' | 'issued' | 'active' | 'closed' | 'cancelled';
 export type PermitRiskLevel = 'low' | 'medium' | 'high';
 export type PermitChecklistPhase = 'pre' | 'during' | 'post';
+export type RootCause =
+  | 'age_wear'
+  | 'abuse_misuse'
+  | 'design_flaw'
+  | 'installation_error'
+  | 'environmental'
+  | 'unknown';
 
 export interface WorkOrderApprovalStep {
   level: 1 | 2;
@@ -63,6 +70,14 @@ export interface WorkOrderPartUsedEntry {
   date: string;
 }
 
+export interface AssetFailureEvent {
+  date: string;
+  woId: string;
+  failureMode: string;
+  rootCause: RootCause;
+  downtimeHours: number;
+}
+
 export interface Site {
   id: string;
   name: string;
@@ -99,6 +114,8 @@ export interface Asset {
   healthStatus: AssetHealthStatus;
   lastServiceDate?: string;
   openWorkOrdersCount: number;
+  failureHistory?: AssetFailureEvent[];
+  mtbfDays?: number;
 }
 
 export interface WorkOrder {
@@ -120,6 +137,9 @@ export interface WorkOrder {
   updatedAt: string;
   resolvedAt?: string;
   closedAt?: string;
+  rootCause?: RootCause;
+  correctiveAction?: string;
+  failureMode?: string;
   checklist?: WorkOrderChecklistItem[];
   timeline?: WorkOrderTimelineEntry[];
   comments?: WorkOrderComment[];
@@ -347,18 +367,85 @@ const subDays = (d: number) => new Date(now.getTime() - d * 24 * 60 * 60 * 1000)
 export const assets: Asset[] = [
   // Pavilion KL - HVAC
   { id: 'asset-1', name: 'AHU-PKL-01', type: 'HVAC', siteId: 'site-1', location: { lat: 3.1490, lng: 101.7133 }, floor: 'B2', zone: 'Zone A', description: 'Main Air Handling Unit - Level B2', manufacturer: 'Daikin', model: 'AHU-5000', serialNumber: 'DK2021-001', healthScore: 92, healthStatus: 'good', lastServiceDate: subDays(15), openWorkOrdersCount: 0 },
-  { id: 'asset-2', name: 'AHU-PKL-02', type: 'HVAC', siteId: 'site-1', location: { lat: 3.1489, lng: 101.7135 }, floor: 'B2', zone: 'Zone B', description: 'Air Handling Unit - Zone B', manufacturer: 'Daikin', model: 'AHU-3000', serialNumber: 'DK2021-002', healthScore: 45, healthStatus: 'critical', lastServiceDate: subDays(60), openWorkOrdersCount: 2 },
+  {
+    id: 'asset-2',
+    name: 'AHU-PKL-02',
+    type: 'HVAC',
+    siteId: 'site-1',
+    location: { lat: 3.1489, lng: 101.7135 },
+    floor: 'B2',
+    zone: 'Zone B',
+    description: 'Air Handling Unit - Zone B',
+    manufacturer: 'Daikin',
+    model: 'AHU-3000',
+    serialNumber: 'DK2021-002',
+    healthScore: 45,
+    healthStatus: 'critical',
+    lastServiceDate: subDays(60),
+    openWorkOrdersCount: 2,
+    mtbfDays: 26,
+    failureHistory: [
+      { date: subDays(120), woId: 'wo-h-1001', failureMode: 'Supply fan bearing noise', rootCause: 'age_wear', downtimeHours: 3.5 },
+      { date: subDays(74), woId: 'wo-h-1002', failureMode: 'Belt slippage', rootCause: 'installation_error', downtimeHours: 2 },
+      { date: subDays(32), woId: 'wo-h-1003', failureMode: 'Motor overheating trip', rootCause: 'environmental', downtimeHours: 4.5 },
+      { date: subDays(4), woId: 'wo-h-1004', failureMode: 'Compressor contactor chatter', rootCause: 'age_wear', downtimeHours: 2.8 },
+    ],
+  },
   { id: 'asset-3', name: 'Chiller-PKL-01', type: 'HVAC', siteId: 'site-1', location: { lat: 3.1487, lng: 101.7130 }, floor: 'B3', zone: 'Plant Room', description: 'Primary Chiller Unit', manufacturer: 'Carrier', model: 'CH-2000', serialNumber: 'CR2020-001', healthScore: 78, healthStatus: 'warning', lastServiceDate: subDays(30), openWorkOrdersCount: 1 },
   { id: 'asset-4', name: 'FCU-PKL-L1-01', type: 'HVAC', siteId: 'site-1', location: { lat: 3.1491, lng: 101.7132 }, floor: 'L1', zone: 'Main Atrium', description: 'Fan Coil Unit - Main Atrium', manufacturer: 'Trane', model: 'FCU-500', serialNumber: 'TR2022-001', healthScore: 95, healthStatus: 'good', lastServiceDate: subDays(7), openWorkOrdersCount: 0 },
 
   // Pavilion KL - Electrical
   { id: 'asset-5', name: 'MDB-PKL-01', type: 'Electrical', siteId: 'site-1', location: { lat: 3.1486, lng: 101.7129 }, floor: 'B3', zone: 'Electrical Room', description: 'Main Distribution Board', manufacturer: 'Schneider', model: 'Prisma P', serialNumber: 'SE2019-001', healthScore: 88, healthStatus: 'good', lastServiceDate: subDays(45), openWorkOrdersCount: 0 },
   { id: 'asset-6', name: 'Generator-PKL-01', type: 'Electrical', siteId: 'site-1', location: { lat: 3.1485, lng: 101.7128 }, floor: 'B3', zone: 'Generator Room', description: 'Emergency Backup Generator', manufacturer: 'Caterpillar', model: 'CAT 3512', serialNumber: 'CAT2018-001', healthScore: 82, healthStatus: 'good', lastServiceDate: subDays(20), openWorkOrdersCount: 0 },
-  { id: 'asset-7', name: 'UPS-PKL-01', type: 'Electrical', siteId: 'site-1', location: { lat: 3.1486, lng: 101.7127 }, floor: 'B3', zone: 'Server Room', description: 'Uninterruptible Power Supply - Server Room', manufacturer: 'APC', model: 'Symmetra PX', serialNumber: 'APC2021-001', healthScore: 35, healthStatus: 'critical', lastServiceDate: subDays(90), openWorkOrdersCount: 1 },
+  {
+    id: 'asset-7',
+    name: 'UPS-PKL-01',
+    type: 'Electrical',
+    siteId: 'site-1',
+    location: { lat: 3.1486, lng: 101.7127 },
+    floor: 'B3',
+    zone: 'Server Room',
+    description: 'Uninterruptible Power Supply - Server Room',
+    manufacturer: 'APC',
+    model: 'Symmetra PX',
+    serialNumber: 'APC2021-001',
+    healthScore: 35,
+    healthStatus: 'critical',
+    lastServiceDate: subDays(90),
+    openWorkOrdersCount: 1,
+    mtbfDays: 41,
+    failureHistory: [
+      { date: subDays(166), woId: 'wo-h-1005', failureMode: 'Battery bank degradation', rootCause: 'age_wear', downtimeHours: 5 },
+      { date: subDays(125), woId: 'wo-h-1006', failureMode: 'Bypass transfer fault', rootCause: 'design_flaw', downtimeHours: 2.2 },
+      { date: subDays(84), woId: 'wo-4', failureMode: 'Battery string failure', rootCause: 'age_wear', downtimeHours: 6.5 },
+    ],
+  },
 
   // Pavilion KL - Elevator
   { id: 'asset-8', name: 'Lift-PKL-01', type: 'Elevator', siteId: 'site-1', location: { lat: 3.1492, lng: 101.7134 }, floor: 'All', zone: 'Main Lobby', description: 'Passenger Elevator #1', manufacturer: 'KONE', model: 'MonoSpace 700', serialNumber: 'KN2019-001', healthScore: 90, healthStatus: 'good', lastServiceDate: subDays(5), openWorkOrdersCount: 0 },
-  { id: 'asset-9', name: 'Lift-PKL-02', type: 'Elevator', siteId: 'site-1', location: { lat: 3.1493, lng: 101.7134 }, floor: 'All', zone: 'Main Lobby', description: 'Passenger Elevator #2', manufacturer: 'KONE', model: 'MonoSpace 700', serialNumber: 'KN2019-002', healthScore: 55, healthStatus: 'warning', lastServiceDate: subDays(25), openWorkOrdersCount: 1 },
+  {
+    id: 'asset-9',
+    name: 'Lift-PKL-02',
+    type: 'Elevator',
+    siteId: 'site-1',
+    location: { lat: 3.1493, lng: 101.7134 },
+    floor: 'All',
+    zone: 'Main Lobby',
+    description: 'Passenger Elevator #2',
+    manufacturer: 'KONE',
+    model: 'MonoSpace 700',
+    serialNumber: 'KN2019-002',
+    healthScore: 55,
+    healthStatus: 'warning',
+    lastServiceDate: subDays(25),
+    openWorkOrdersCount: 1,
+    mtbfDays: 34,
+    failureHistory: [
+      { date: subDays(74), woId: 'wo-h-1007', failureMode: 'Door lock circuit intermittent', rootCause: 'abuse_misuse', downtimeHours: 3.2 },
+      { date: subDays(40), woId: 'wo-h-1008', failureMode: 'Floor leveling offset', rootCause: 'installation_error', downtimeHours: 2.4 },
+      { date: subDays(1), woId: 'wo-8', failureMode: 'Control encoder drift', rootCause: 'unknown', downtimeHours: 1.6 },
+    ],
+  },
   { id: 'asset-10', name: 'Escalator-PKL-01', type: 'Elevator', siteId: 'site-1', location: { lat: 3.1488, lng: 101.7131 }, floor: 'GF-L1', zone: 'Main Entrance', description: 'Escalator - Main Entrance', manufacturer: 'Schindler', model: 'Schindler 9300', serialNumber: 'SC2020-001', healthScore: 85, healthStatus: 'good', lastServiceDate: subDays(10), openWorkOrdersCount: 0 },
 
   // Pavilion KL - Fire Safety
@@ -380,7 +467,29 @@ export const assets: Asset[] = [
   { id: 'asset-20', name: 'Chiller-SP-02', type: 'HVAC', siteId: 'site-2', location: { lat: 3.0731, lng: 101.6077 }, floor: 'B3', zone: 'Plant Room', description: 'Secondary Chiller', manufacturer: 'York', model: 'YK-2500', serialNumber: 'YK2019-012', healthScore: 40, healthStatus: 'critical', lastServiceDate: subDays(55), openWorkOrdersCount: 2 },
 
   // Sunway Pyramid - Electrical
-  { id: 'asset-21', name: 'MDB-SP-01', type: 'Electrical', siteId: 'site-2', location: { lat: 3.0730, lng: 101.6075 }, floor: 'B3', zone: 'Electrical Room', description: 'Main Distribution Board', manufacturer: 'ABB', model: 'MNS 3.0', serialNumber: 'ABB2018-011', healthScore: 90, healthStatus: 'good', lastServiceDate: subDays(22), openWorkOrdersCount: 0 },
+  {
+    id: 'asset-21',
+    name: 'MDB-SP-01',
+    type: 'Electrical',
+    siteId: 'site-2',
+    location: { lat: 3.0730, lng: 101.6075 },
+    floor: 'B3',
+    zone: 'Electrical Room',
+    description: 'Main Distribution Board',
+    manufacturer: 'ABB',
+    model: 'MNS 3.0',
+    serialNumber: 'ABB2018-011',
+    healthScore: 90,
+    healthStatus: 'good',
+    lastServiceDate: subDays(22),
+    openWorkOrdersCount: 0,
+    mtbfDays: 72,
+    failureHistory: [
+      { date: subDays(210), woId: 'wo-h-1009', failureMode: 'Loose feeder termination', rootCause: 'installation_error', downtimeHours: 2.1 },
+      { date: subDays(138), woId: 'wo-h-1010', failureMode: 'Thermal hotspot at breaker B4', rootCause: 'environmental', downtimeHours: 2.8 },
+      { date: subDays(10), woId: 'wo-17', failureMode: 'Busbar thermal hotspot', rootCause: 'age_wear', downtimeHours: 1.4 },
+    ],
+  },
   { id: 'asset-22', name: 'Generator-SP-01', type: 'Electrical', siteId: 'site-2', location: { lat: 3.0729, lng: 101.6074 }, floor: 'B3', zone: 'Generator Room', description: 'Emergency Generator #1', manufacturer: 'Cummins', model: 'C2500D5', serialNumber: 'CM2017-011', healthScore: 78, healthStatus: 'warning', lastServiceDate: subDays(35), openWorkOrdersCount: 0 },
   { id: 'asset-23', name: 'Generator-SP-02', type: 'Electrical', siteId: 'site-2', location: { lat: 3.0728, lng: 101.6074 }, floor: 'B3', zone: 'Generator Room', description: 'Emergency Generator #2', manufacturer: 'Cummins', model: 'C2500D5', serialNumber: 'CM2017-012', healthScore: 80, healthStatus: 'good', lastServiceDate: subDays(35), openWorkOrdersCount: 0 },
 
@@ -406,7 +515,29 @@ export const assets: Asset[] = [
 
   // Mid Valley Megamall - Electrical
   { id: 'asset-36', name: 'MDB-MV-01', type: 'Electrical', siteId: 'site-3', location: { lat: 3.1174, lng: 101.6770 }, floor: 'B3', zone: 'Electrical Room', description: 'Main Distribution Board - North', manufacturer: 'Siemens', model: 'SIVACON S8', serialNumber: 'SI2017-021', healthScore: 92, healthStatus: 'good', lastServiceDate: subDays(30), openWorkOrdersCount: 0 },
-  { id: 'asset-37', name: 'MDB-MV-02', type: 'Electrical', siteId: 'site-3', location: { lat: 3.1173, lng: 101.6771 }, floor: 'B3', zone: 'Electrical Room', description: 'Main Distribution Board - South', manufacturer: 'Siemens', model: 'SIVACON S8', serialNumber: 'SI2017-022', healthScore: 30, healthStatus: 'critical', lastServiceDate: subDays(95), openWorkOrdersCount: 2 },
+  {
+    id: 'asset-37',
+    name: 'MDB-MV-02',
+    type: 'Electrical',
+    siteId: 'site-3',
+    location: { lat: 3.1173, lng: 101.6771 },
+    floor: 'B3',
+    zone: 'Electrical Room',
+    description: 'Main Distribution Board - South',
+    manufacturer: 'Siemens',
+    model: 'SIVACON S8',
+    serialNumber: 'SI2017-022',
+    healthScore: 30,
+    healthStatus: 'critical',
+    lastServiceDate: subDays(95),
+    openWorkOrdersCount: 2,
+    mtbfDays: 24,
+    failureHistory: [
+      { date: subDays(118), woId: 'wo-h-1011', failureMode: 'Breaker thermal trip', rootCause: 'age_wear', downtimeHours: 4.2 },
+      { date: subDays(46), woId: 'wo-h-1012', failureMode: 'Phase imbalance alarm', rootCause: 'design_flaw', downtimeHours: 3.1 },
+      { date: subDays(1), woId: 'wo-2', failureMode: 'Panel overheating alert', rootCause: 'environmental', downtimeHours: 2.7 },
+    ],
+  },
   { id: 'asset-38', name: 'Generator-MV-01', type: 'Electrical', siteId: 'site-3', location: { lat: 3.1172, lng: 101.6769 }, floor: 'B3', zone: 'Generator Room', description: 'Backup Generator - Primary', manufacturer: 'Perkins', model: '4012-46TAG2A', serialNumber: 'PK2016-021', healthScore: 75, healthStatus: 'warning', lastServiceDate: subDays(42), openWorkOrdersCount: 0 },
   { id: 'asset-39', name: 'Transformer-MV-01', type: 'Electrical', siteId: 'site-3', location: { lat: 3.1171, lng: 101.6768 }, floor: 'B3', zone: 'Substation', description: 'Main Transformer', manufacturer: 'ABB', model: 'Distribution Transformer', serialNumber: 'ABB2015-021', healthScore: 85, healthStatus: 'good', lastServiceDate: subDays(60), openWorkOrdersCount: 0 },
 
@@ -430,10 +561,75 @@ export const assets: Asset[] = [
   { id: 'asset-50', name: 'LED-Display-MV', type: 'IT/AV', siteId: 'site-3', location: { lat: 3.1181, lng: 101.6775 }, floor: 'GF', zone: 'Centre Court', description: 'Giant LED Display - Centre Court', manufacturer: 'Samsung', model: 'IF Series', serialNumber: 'SS2021-021', healthScore: 98, healthStatus: 'good', lastServiceDate: subDays(2), openWorkOrdersCount: 0 },
 
   // Additional assets for variety
-  { id: 'asset-51', name: 'CRAC-SP-Server', type: 'HVAC', siteId: 'site-2', location: { lat: 3.0739, lng: 101.6084 }, floor: 'B1', zone: 'Server Room', description: 'Computer Room Air Conditioner', manufacturer: 'Liebert', model: 'DS', serialNumber: 'LB2021-011', healthScore: 83, healthStatus: 'good', lastServiceDate: subDays(11), openWorkOrdersCount: 0 },
+  {
+    id: 'asset-51',
+    name: 'CRAC-SP-Server',
+    type: 'HVAC',
+    siteId: 'site-2',
+    location: { lat: 3.0739, lng: 101.6084 },
+    floor: 'B1',
+    zone: 'Server Room',
+    description: 'Computer Room Air Conditioner',
+    manufacturer: 'Liebert',
+    model: 'DS',
+    serialNumber: 'LB2021-011',
+    healthScore: 83,
+    healthStatus: 'good',
+    lastServiceDate: subDays(11),
+    openWorkOrdersCount: 0,
+    mtbfDays: 29,
+    failureHistory: [
+      { date: subDays(95), woId: 'wo-h-1013', failureMode: 'Compressor short cycling', rootCause: 'design_flaw', downtimeHours: 4.5 },
+      { date: subDays(38), woId: 'wo-h-1014', failureMode: 'Condenser fan speed variance', rootCause: 'installation_error', downtimeHours: 3.8 },
+      { date: subDays(4), woId: 'wo-26', failureMode: 'Supply air temperature drift', rootCause: 'environmental', downtimeHours: 4.1 },
+    ],
+  },
   { id: 'asset-52', name: 'VRV-PKL-Office', type: 'HVAC', siteId: 'site-1', location: { lat: 3.1494, lng: 101.7136 }, floor: 'L5', zone: 'Management Office', description: 'VRV System - Management Office', manufacturer: 'Daikin', model: 'VRV IV', serialNumber: 'DK2022-003', healthScore: 96, healthStatus: 'good', lastServiceDate: subDays(4), openWorkOrdersCount: 0 },
-  { id: 'asset-53', name: 'EV-Charger-MV-01', type: 'Electrical', siteId: 'site-3', location: { lat: 3.1167, lng: 101.6764 }, floor: 'B2', zone: 'Car Park A', description: 'EV Charging Station #1', manufacturer: 'Tesla', model: 'Wall Connector', serialNumber: 'TS2023-021', healthScore: 100, healthStatus: 'good', lastServiceDate: subDays(1), openWorkOrdersCount: 0 },
-  { id: 'asset-54', name: 'Travellator-SP-01', type: 'Elevator', siteId: 'site-2', location: { lat: 3.0741, lng: 101.6086 }, floor: 'L1-L2', zone: 'East Wing', description: 'Moving Walkway', manufacturer: 'KONE', model: 'TravelMaster 115', serialNumber: 'KN2020-011', healthScore: 79, healthStatus: 'warning', lastServiceDate: subDays(22), openWorkOrdersCount: 1 },
+  {
+    id: 'asset-53',
+    name: 'EV-Charger-MV-01',
+    type: 'Electrical',
+    siteId: 'site-3',
+    location: { lat: 3.1167, lng: 101.6764 },
+    floor: 'B2',
+    zone: 'Car Park A',
+    description: 'EV Charging Station #1',
+    manufacturer: 'Tesla',
+    model: 'Wall Connector',
+    serialNumber: 'TS2023-021',
+    healthScore: 100,
+    healthStatus: 'good',
+    lastServiceDate: subDays(1),
+    openWorkOrdersCount: 0,
+    mtbfDays: 45,
+    failureHistory: [
+      { date: subDays(51), woId: 'wo-h-1015', failureMode: 'Connector overheating', rootCause: 'abuse_misuse', downtimeHours: 2.3 },
+      { date: subDays(6), woId: 'wo-27', failureMode: 'Control board communication fault', rootCause: 'design_flaw', downtimeHours: 3.4 },
+    ],
+  },
+  {
+    id: 'asset-54',
+    name: 'Travellator-SP-01',
+    type: 'Elevator',
+    siteId: 'site-2',
+    location: { lat: 3.0741, lng: 101.6086 },
+    floor: 'L1-L2',
+    zone: 'East Wing',
+    description: 'Moving Walkway',
+    manufacturer: 'KONE',
+    model: 'TravelMaster 115',
+    serialNumber: 'KN2020-011',
+    healthScore: 79,
+    healthStatus: 'warning',
+    lastServiceDate: subDays(22),
+    openWorkOrdersCount: 1,
+    mtbfDays: 64,
+    failureHistory: [
+      { date: subDays(150), woId: 'wo-h-1016', failureMode: 'Handrail speed mismatch', rootCause: 'installation_error', downtimeHours: 1.8 },
+      { date: subDays(86), woId: 'wo-h-1017', failureMode: 'Drive chain stretch', rootCause: 'age_wear', downtimeHours: 3.3 },
+      { date: subDays(20), woId: 'wo-20', failureMode: 'Speed control drift', rootCause: 'unknown', downtimeHours: 2.1 },
+    ],
+  },
   { id: 'asset-55', name: 'Smoke-Exhaust-PKL', type: 'Fire Safety', siteId: 'site-1', location: { lat: 3.1489, lng: 101.7128 }, floor: 'All', zone: 'Central Shaft', description: 'Smoke Extraction System', manufacturer: 'Systemair', model: 'AXC', serialNumber: 'SY2019-001', healthScore: 91, healthStatus: 'good', lastServiceDate: subDays(8), openWorkOrdersCount: 0 },
 ];
 
@@ -607,7 +803,7 @@ const baseWorkOrders: Omit<WorkOrder, 'labourEntries' | 'partsUsed' | 'totalLabo
 
   // Resolved Work Orders
   {
-    id: 'wo-13', number: 'WO-2024-00013', siteId: 'site-1', assetId: 'asset-4', title: 'FCU Thermostat Calibration', description: 'Thermostat reading 2 degrees off. Recalibrated successfully.', faultType: 'Calibration', priority: 'P4', status: 'resolved', assignedToId: 'user-8', slaDeadline: addDays(1), createdAt: subDays(3), updatedAt: subDays(1), resolvedAt: subDays(1),
+    id: 'wo-13', number: 'WO-2024-00013', siteId: 'site-1', assetId: 'asset-4', title: 'FCU Thermostat Calibration', description: 'Thermostat reading 2 degrees off. Recalibrated successfully.', faultType: 'Calibration', priority: 'P4', status: 'resolved', assignedToId: 'user-8', slaDeadline: addDays(1), createdAt: subDays(3), updatedAt: subDays(1), resolvedAt: subDays(1), rootCause: 'installation_error', failureMode: 'Thermostat sensor offset', correctiveAction: 'Recalibrated thermostat, replaced weak sensor connector, and validated readings against handheld probe for 30 minutes.',
     timeline: [
       { id: 'tl-25', type: 'created', description: 'Work order created', userId: 'user-2', createdAt: subDays(3) },
       { id: 'tl-26', type: 'assigned', description: 'Assigned to Zain Hassan', userId: 'user-2', createdAt: subDays(2.5) },
@@ -615,7 +811,7 @@ const baseWorkOrders: Omit<WorkOrder, 'labourEntries' | 'partsUsed' | 'totalLabo
     ]
   },
   {
-    id: 'wo-14', number: 'WO-2024-00014', siteId: 'site-2', assetId: 'asset-24', title: 'Elevator Door Sensor Replacement', description: 'Door sensor replaced and tested.', faultType: 'Sensor Failure', priority: 'P2', status: 'resolved', assignedToId: 'user-5', contractorId: 'contractor-3', slaDeadline: addHours(8), createdAt: subDays(2), updatedAt: subDays(1.5), resolvedAt: subDays(1.5),
+    id: 'wo-14', number: 'WO-2024-00014', siteId: 'site-2', assetId: 'asset-24', title: 'Elevator Door Sensor Replacement', description: 'Door sensor replaced and tested.', faultType: 'Sensor Failure', priority: 'P2', status: 'resolved', assignedToId: 'user-5', contractorId: 'contractor-3', slaDeadline: addHours(8), createdAt: subDays(2), updatedAt: subDays(1.5), resolvedAt: subDays(1.5), rootCause: 'age_wear', failureMode: 'Door edge safety sensor no response', correctiveAction: 'Replaced door edge sensor pair, aligned brackets, and ran 50 open/close cycles with no repeat fault.',
     timeline: [
       { id: 'tl-28', type: 'created', description: 'Emergency work order created', userId: 'user-3', createdAt: subDays(2) },
       { id: 'tl-29', type: 'assigned', description: 'Otis technician dispatched', userId: 'user-3', createdAt: subDays(1.9) },
@@ -623,7 +819,7 @@ const baseWorkOrders: Omit<WorkOrder, 'labourEntries' | 'partsUsed' | 'totalLabo
     ]
   },
   {
-    id: 'wo-15', number: 'WO-2024-00015', siteId: 'site-3', assetId: 'asset-46', title: 'Fire Panel Zone Test', description: 'Monthly zone test completed. All zones functioning.', faultType: 'Testing', priority: 'P3', status: 'resolved', assignedToId: 'user-6', slaDeadline: addDays(2), createdAt: subDays(5), updatedAt: subDays(3), resolvedAt: subDays(3),
+    id: 'wo-15', number: 'WO-2024-00015', siteId: 'site-3', assetId: 'asset-46', title: 'Fire Panel Zone Test', description: 'Monthly zone test completed. All zones functioning.', faultType: 'Testing', priority: 'P3', status: 'resolved', assignedToId: 'user-6', slaDeadline: addDays(2), createdAt: subDays(5), updatedAt: subDays(3), resolvedAt: subDays(3), rootCause: 'unknown', failureMode: 'Intermittent zone communication timeout', correctiveAction: 'Cleaned terminal points, reseated zone card, and performed full panel self-test with no further timeout.',
     timeline: [
       { id: 'tl-31', type: 'created', description: 'Monthly test scheduled', userId: 'user-4', createdAt: subDays(5) },
       { id: 'tl-32', type: 'status_change', description: 'Testing completed - all zones OK', userId: 'user-6', createdAt: subDays(3) }
@@ -632,13 +828,13 @@ const baseWorkOrders: Omit<WorkOrder, 'labourEntries' | 'partsUsed' | 'totalLabo
 
   // Closed Work Orders
   {
-    id: 'wo-16', number: 'WO-2024-00016', siteId: 'site-1', assetId: 'asset-11', title: 'Fire Pump Annual Test', description: 'Annual fire pump test completed and certified.', faultType: 'Annual Inspection', priority: 'P2', status: 'closed', assignedToId: 'user-6', contractorId: 'contractor-5', slaDeadline: addDays(1), createdAt: subDays(7), updatedAt: subDays(5), resolvedAt: subDays(5.5), closedAt: subDays(5),
+    id: 'wo-16', number: 'WO-2024-00016', siteId: 'site-1', assetId: 'asset-11', title: 'Fire Pump Annual Test', description: 'Annual fire pump test completed and certified.', faultType: 'Annual Inspection', priority: 'P2', status: 'closed', assignedToId: 'user-6', contractorId: 'contractor-5', slaDeadline: addDays(1), createdAt: subDays(7), updatedAt: subDays(5), resolvedAt: subDays(5.5), closedAt: subDays(5), rootCause: 'age_wear', failureMode: 'Pressure fluctuation at high load', correctiveAction: 'Replaced worn coupling bush and rebalanced impeller alignment to restore stable discharge pressure.',
   },
   {
-    id: 'wo-17', number: 'WO-2024-00017', siteId: 'site-2', assetId: 'asset-21', title: 'MDB Thermal Imaging', description: 'Thermal imaging completed. Minor hotspots identified and rectified.', faultType: 'Inspection', priority: 'P3', status: 'closed', assignedToId: 'user-7', contractorId: 'contractor-2', slaDeadline: addDays(3), createdAt: subDays(10), updatedAt: subDays(8), resolvedAt: subDays(8.5), closedAt: subDays(8),
+    id: 'wo-17', number: 'WO-2024-00017', siteId: 'site-2', assetId: 'asset-21', title: 'MDB Thermal Imaging', description: 'Thermal imaging completed. Minor hotspots identified and rectified.', faultType: 'Inspection', priority: 'P3', status: 'closed', assignedToId: 'user-7', contractorId: 'contractor-2', slaDeadline: addDays(3), createdAt: subDays(10), updatedAt: subDays(8), resolvedAt: subDays(8.5), closedAt: subDays(8), rootCause: 'installation_error', failureMode: 'Loose cable lug at outgoing feeder', correctiveAction: 'Reterminated feeder lug, applied torque to OEM specification, and added torque-check label for monthly rounds.',
   },
   {
-    id: 'wo-18', number: 'WO-2024-00018', siteId: 'site-3', assetId: 'asset-40', title: 'Glass Elevator Cleaning', description: 'Quarterly glass cleaning completed.', faultType: 'Cleaning', priority: 'P4', status: 'closed', assignedToId: 'user-7', slaDeadline: addDays(5), createdAt: subDays(12), updatedAt: subDays(10), resolvedAt: subDays(10.5), closedAt: subDays(10),
+    id: 'wo-18', number: 'WO-2024-00018', siteId: 'site-3', assetId: 'asset-40', title: 'Glass Elevator Cleaning', description: 'Quarterly glass cleaning completed.', faultType: 'Cleaning', priority: 'P4', status: 'closed', assignedToId: 'user-7', slaDeadline: addDays(5), createdAt: subDays(12), updatedAt: subDays(10), resolvedAt: subDays(10.5), closedAt: subDays(10), rootCause: 'abuse_misuse', failureMode: 'Door track contamination and drag', correctiveAction: 'Removed debris buildup from sill channel, adjusted door gap, and briefed cleaning contractor on protected zones.',
   },
 
   // More recent work orders for variety
@@ -661,12 +857,12 @@ const baseWorkOrders: Omit<WorkOrder, 'labourEntries' | 'partsUsed' | 'totalLabo
   { id: 'wo-22', number: 'WO-2024-00022', siteId: 'site-1', assetId: 'asset-15', title: 'PA System Static Noise', description: 'Static noise reported on PA system in L3.', faultType: 'Audio Issue', priority: 'P4', status: 'open', slaDeadline: addDays(3), createdAt: subDays(0.3), updatedAt: subDays(0.3) },
   { id: 'wo-23', number: 'WO-2024-00023', siteId: 'site-2', assetId: 'asset-29', title: 'Water Pump Pressure Drop', description: 'Domestic water pressure lower than normal.', faultType: 'Pressure Issue', priority: 'P3', status: 'in_progress', assignedToId: 'user-5', slaDeadline: addHours(24), createdAt: subDays(0.8), updatedAt: subDays(0.2) },
   { id: 'wo-24', number: 'WO-2024-00024', siteId: 'site-3', assetId: 'asset-48', title: 'STP Odor Complaint', description: 'Odor complaint near STP area. Inspection needed.', faultType: 'Environmental', priority: 'P2', status: 'assigned', assignedToId: 'user-6', slaDeadline: addHours(8), createdAt: subDays(0.2), updatedAt: subDays(0.1) },
-  { id: 'wo-25', number: 'WO-2024-00025', siteId: 'site-1', assetId: 'asset-52', title: 'VRV System Error Code', description: 'Error code E3 displayed on VRV controller.', faultType: 'Control Error', priority: 'P3', status: 'resolved', assignedToId: 'user-8', slaDeadline: addHours(24), createdAt: subDays(2), updatedAt: subDays(1), resolvedAt: subDays(1) },
-  { id: 'wo-26', number: 'WO-2024-00026', siteId: 'site-2', assetId: 'asset-51', title: 'Server Room Temperature High', description: 'CRAC unit not maintaining temperature.', faultType: 'Temperature Control', priority: 'P1', status: 'closed', assignedToId: 'user-7', slaDeadline: addHours(2), createdAt: subDays(4), updatedAt: subDays(3.5), resolvedAt: subDays(3.6), closedAt: subDays(3.5) },
-  { id: 'wo-27', number: 'WO-2024-00027', siteId: 'site-3', assetId: 'asset-53', title: 'EV Charger Fault', description: 'EV charger #1 showing fault code.', faultType: 'Charger Fault', priority: 'P3', status: 'closed', assignedToId: 'user-6', slaDeadline: addHours(48), createdAt: subDays(6), updatedAt: subDays(5), resolvedAt: subDays(5.2), closedAt: subDays(5) },
+  { id: 'wo-25', number: 'WO-2024-00025', siteId: 'site-1', assetId: 'asset-52', title: 'VRV System Error Code', description: 'Error code E3 displayed on VRV controller.', faultType: 'Control Error', priority: 'P3', status: 'resolved', assignedToId: 'user-8', slaDeadline: addHours(24), createdAt: subDays(2), updatedAt: subDays(1), resolvedAt: subDays(1), rootCause: 'design_flaw', failureMode: 'Indoor-outdoor communication board reset loop', correctiveAction: 'Upgraded control board firmware and added signal stabilizer module based on OEM bulletin.' },
+  { id: 'wo-26', number: 'WO-2024-00026', siteId: 'site-2', assetId: 'asset-51', title: 'Server Room Temperature High', description: 'CRAC unit not maintaining temperature.', faultType: 'Temperature Control', priority: 'P1', status: 'closed', assignedToId: 'user-7', slaDeadline: addHours(2), createdAt: subDays(4), updatedAt: subDays(3.5), resolvedAt: subDays(3.6), closedAt: subDays(3.5), rootCause: 'environmental', failureMode: 'Condenser airflow restriction', correctiveAction: 'Cleared condenser coil blockage, restored airflow pathway, and set weekly PM checklist for coil inspection.' },
+  { id: 'wo-27', number: 'WO-2024-00027', siteId: 'site-3', assetId: 'asset-53', title: 'EV Charger Fault', description: 'EV charger #1 showing fault code.', faultType: 'Charger Fault', priority: 'P3', status: 'closed', assignedToId: 'user-6', slaDeadline: addHours(48), createdAt: subDays(6), updatedAt: subDays(5), resolvedAt: subDays(5.2), closedAt: subDays(5), rootCause: 'abuse_misuse', failureMode: 'Charge connector latch damage', correctiveAction: 'Replaced connector head and installed usage signage to reduce forced disconnect events.' },
   { id: 'wo-28', number: 'WO-2024-00028', siteId: 'site-1', assetId: 'asset-55', title: 'Smoke Exhaust Fan Test', description: 'Quarterly smoke exhaust test due.', faultType: 'Testing', priority: 'P3', status: 'resolved', assignedToId: 'user-8', slaDeadline: addDays(5), createdAt: subDays(8), updatedAt: subDays(6), resolvedAt: subDays(6) },
   { id: 'wo-29', number: 'WO-2024-00029', siteId: 'site-2', assetId: 'asset-22', title: 'Generator Load Bank Test', description: 'Annual load bank test scheduled.', faultType: 'Testing', priority: 'P3', status: 'pending_parts', assignedToId: 'user-5', slaDeadline: addDays(7), createdAt: subDays(3), updatedAt: subDays(1) },
-  { id: 'wo-30', number: 'WO-2024-00030', siteId: 'site-3', assetId: 'asset-38', title: 'Generator Fuel Filter Change', description: 'Scheduled fuel filter replacement.', faultType: 'Filter Change', priority: 'P4', status: 'closed', assignedToId: 'user-6', slaDeadline: addDays(10), createdAt: subDays(15), updatedAt: subDays(12), resolvedAt: subDays(12.5), closedAt: subDays(12) },
+  { id: 'wo-30', number: 'WO-2024-00030', siteId: 'site-3', assetId: 'asset-38', title: 'Generator Fuel Filter Change', description: 'Scheduled fuel filter replacement.', faultType: 'Filter Change', priority: 'P4', status: 'closed', assignedToId: 'user-6', slaDeadline: addDays(10), createdAt: subDays(15), updatedAt: subDays(12), resolvedAt: subDays(12.5), closedAt: subDays(12), rootCause: 'age_wear', failureMode: 'Fuel filter saturation', correctiveAction: 'Replaced primary and secondary fuel filters and moved replacement interval from quarterly to bi-monthly.' },
   { id: 'wo-31', number: 'WO-2024-00031', siteId: 'site-1', assetId: 'asset-6', title: 'Generator Monthly Run', description: 'Monthly generator run and inspection.', faultType: 'Preventive Maintenance', priority: 'P4', status: 'closed', assignedToId: 'user-8', slaDeadline: addDays(3), createdAt: subDays(20), updatedAt: subDays(18), resolvedAt: subDays(18.5), closedAt: subDays(18) },
   { id: 'wo-32', number: 'WO-2024-00032', siteId: 'site-2', assetId: 'asset-28', title: 'Sprinkler System Inspection', description: 'Annual sprinkler inspection and certification.', faultType: 'Annual Inspection', priority: 'P2', status: 'closed', assignedToId: 'user-7', contractorId: 'contractor-5', slaDeadline: addDays(5), createdAt: subDays(14), updatedAt: subDays(12), resolvedAt: subDays(12.5), closedAt: subDays(12) },
 ];

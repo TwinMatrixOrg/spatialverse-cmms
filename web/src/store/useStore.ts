@@ -24,6 +24,7 @@ import {
   PMSchedule,
   AppNotification,
   permits as seedPermits,
+  RootCause,
   pmSchedules as initialPMSchedules,
   notifications as initialNotifications,
   WorkOrderLabourEntry,
@@ -111,6 +112,12 @@ interface AppState {
   createPermit: (input: CreatePermitInput) => Permit;
   updatePermitStatus: (permitId: string, status: PermitStatus) => void;
   togglePermitChecklistItem: (permitId: string, checklistItemId: string, completedById?: string) => void;
+  saveRCA: (
+    workOrderId: string,
+    rootCause: RootCause,
+    failureMode: string,
+    correctiveAction: string
+  ) => void;
   pmSchedules: PMSchedule[];
   notifications: AppNotification[];
   assetHealthBandFilter: AssetHealthBand;
@@ -748,6 +755,39 @@ export const useStore = create<AppState>()(
                   id: `cm-${workOrder.id}-rejection-${timestamp}`,
                   userId: approverId,
                   message: `Rejection reason (${approverName}): ${trimmedComment}`,
+                  createdAt: timestamp,
+                },
+              ],
+            };
+          }),
+        }));
+      },
+      saveRCA: (workOrderId, rootCause, failureMode, correctiveAction) => {
+        const timestamp = new Date().toISOString();
+        const trimmedFailureMode = failureMode.trim();
+        const trimmedCorrectiveAction = correctiveAction.trim();
+
+        set((state) => ({
+          workOrders: state.workOrders.map((workOrder) => {
+            if (workOrder.id !== workOrderId) {
+              return workOrder;
+            }
+
+            const rcaExists = Boolean(workOrder.rootCause || workOrder.failureMode || workOrder.correctiveAction);
+
+            return {
+              ...workOrder,
+              rootCause,
+              failureMode: trimmedFailureMode,
+              correctiveAction: trimmedCorrectiveAction,
+              updatedAt: timestamp,
+              timeline: [
+                ...(workOrder.timeline || []),
+                {
+                  id: `tl-${workOrder.id}-rca-${timestamp}`,
+                  type: 'rca',
+                  description: rcaExists ? 'RCA updated' : 'RCA captured',
+                  userId: 'user-2',
                   createdAt: timestamp,
                 },
               ],

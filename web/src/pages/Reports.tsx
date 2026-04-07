@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   Box,
   Typography,
@@ -33,8 +33,8 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts';
-import { subDays } from 'date-fns';
-import { contractors, pmSchedules, getAssetById, sites } from '../data/mockData';
+import { format, startOfMonth, subDays, subMonths } from 'date-fns';
+import { contractors, pmSchedules, getAssetById, sites, workOrders, assets, RootCause } from '../data/mockData';
 import { useStore } from '../store/useStore';
 
 const woTrendData = [
@@ -66,6 +66,24 @@ const faultCategories = [
 ];
 
 const COLORS = ['#29B6F6', '#FFA726', '#66BB6A', '#AB47BC', '#EF5350', '#78909C'];
+
+const rootCauseLabelMap: Record<RootCause, string> = {
+  age_wear: 'Age / Wear',
+  abuse_misuse: 'Abuse / Misuse',
+  design_flaw: 'Design Flaw',
+  installation_error: 'Installation Error',
+  environmental: 'Environmental',
+  unknown: 'Unknown',
+};
+
+const rootCauseColors: Record<RootCause, string> = {
+  age_wear: '#66BB6A',
+  abuse_misuse: '#EF5350',
+  design_flaw: '#AB47BC',
+  installation_error: '#FFA726',
+  environmental: '#29B6F6',
+  unknown: '#78909C',
+};
 
 const pmComplianceTrend = [
   { month: 'Nov', compliance: 60 },
@@ -195,6 +213,120 @@ export default function Reports() {
   const overduePPMTasksThisMonth = 8;
   const ppmComplianceThisMonth = Math.round((completedPPMTasksThisMonth / totalPPMTasksThisMonth) * 100);
 
+  const failureEvents = useMemo(
+    () =>
+      assets.flatMap((asset) =>
+        (asset.failureHistory || []).map((failureEvent) => ({
+          ...failureEvent,
+          assetId: asset.id,
+          assetName: asset.name,
+          assetType: asset.type,
+          mtbfDays: asset.mtbfDays,
+        }))
+      ),
+    []
+  );
+
+  const rootCauseDistribution = useMemo(() => {
+    const rootCauseCounts: Record<RootCause, number> = {
+      age_wear: 0,
+      abuse_misuse: 0,
+      design_flaw: 0,
+      installation_error: 0,
+      environmental: 0,
+      unknown: 0,
+    };
+
+    workOrders
+      .filter((workOrder) => ['resolved', 'closed'].includes(workOrder.status) && workOrder.rootCause)
+      .forEach((workOrder) => {
+        rootCauseCounts[workOrder.rootCause as RootCause] += 1;
+      });
+
+    return (Object.keys(rootCauseCounts) as RootCause[])
+      .map((rootCause) => ({
+        name: rootCauseLabelMap[rootCause],
+        value: rootCauseCounts[rootCause],
+        color: rootCauseColors[rootCause],
+      }))
+      .filter((entry) => entry.value > 0);
+  }, []);
+
+  const mtbfByAssetTypeData = useMemo(() => {
+    const grouped = assets.reduce<Record<string, number[]>>((acc, asset) => {
+      if (typeof asset.mtbfDays !== 'number') {
+        return acc;
+      }
+
+      if (!acc[asset.type]) {
+        acc[asset.type] = [];
+      }
+
+      acc[asset.type].push(asset.mtbfDays);
+      return acc;
+    }, {});
+
+    return Object.entries(grouped)
+      .map(([type, mtbfValues]) => ({
+        type,
+        mtbfDays: Math.round(mtbfValues.reduce((sum, value) => sum + value, 0) / mtbfValues.length),
+      }))
+      .sort((assetTypeA, assetTypeB) => assetTypeA.mtbfDays - assetTypeB.mtbfDays);
+  }, []);
+
+  const monthlyFailureCountData = useMemo(() => {
+    const monthStarts = Array.from({ length: 6 }, (_, index) => startOfMonth(subMonths(new Date(), 5 - index)));
+
+    return monthStarts.map((monthStart, index) => {
+      const nextMonthStart =
+        index === monthStarts.length - 1
+          ? startOfMonth(subMonths(monthStart, -1))
+          : monthStarts[index + 1];
+
+      const failureCount = failureEvents.filter((failureEvent) => {
+        const eventTime = new Date(failureEvent.date).getTime();
+        return eventTime >= monthStart.getTime() && eventTime < nextMonthStart.getTime();
+      }).length;
+
+      return {
+        month: format(monthStart, 'MMM'),
+        failures: failureCount,
+      };
+    });
+  }, [failureEvents]);
+
+  const topFailingAssets = useMemo(() => {
+    return assets
+      .map((asset) => {
+        const failureHistory = asset.failureHistory || [];
+        const lastFailureDate =
+          failureHistory.length > 0
+            ? [...failureHistory].sort(
+                (failureEventA, failureEventB) =>
+                  new Date(failureEventB.date).getTime() - new Date(failureEventA.date).getTime()
+              )[0].date
+            : null;
+
+        return {
+          id: asset.id,
+          name: asset.name,
+          type: asset.type,
+          failures: failureHistory.length,
+          mtbfDays: asset.mtbfDays,
+          lastFailureDate,
+        };
+      })
+      .filter((asset) => asset.failures > 0)
+      .sort((assetA, assetB) => {
+        if (assetB.failures !== assetA.failures) {
+          return assetB.failures - assetA.failures;
+        }
+
+        return (assetA.mtbfDays ?? Number.MAX_SAFE_INTEGER) - (assetB.mtbfDays ?? Number.MAX_SAFE_INTEGER);
+      })
+      .slice(0, 5);
+  }, []);
+
   return (
       <Box>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
@@ -303,6 +435,7 @@ export default function Reports() {
           <Tab label="Fault Categories" />
           <Tab label="Contractor Performance" />
           <Tab label="PPM Compliance" />
+          <Tab label="Failure Analysis" />
         </Tabs>
 
         {/* Work Orders Tab */}
@@ -712,6 +845,122 @@ export default function Reports() {
                                 sx={{ fontWeight: 600 }}
                               />
                             </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                </CardContent>
+              </Card>
+            </Grid>
+          </Grid>
+        )}
+
+        {activeTab === 5 && (
+          <Grid container spacing={3}>
+            <Grid size={{ xs: 12, lg: 4 }}>
+              <Card>
+                <CardContent>
+                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
+                    Root Cause Distribution
+                  </Typography>
+                  <Box sx={{ height: 320 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={rootCauseDistribution}
+                          cx="50%"
+                          cy="50%"
+                          outerRadius={110}
+                          dataKey="value"
+                          label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                        >
+                          {rootCauseDistribution.map((entry, index) => (
+                            <Cell key={`rca-root-cause-${index}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </Box>
+                </CardContent>
+              </Card>
+            </Grid>
+
+            <Grid size={{ xs: 12, lg: 8 }}>
+              <Card>
+                <CardContent>
+                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
+                    MTBF by Asset Type
+                  </Typography>
+                  <Box sx={{ height: 320 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={mtbfByAssetTypeData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />
+                        <XAxis dataKey="type" stroke={theme.palette.text.secondary} />
+                        <YAxis unit="d" stroke={theme.palette.text.secondary} />
+                        <Tooltip formatter={(value: number) => [`${value} days`, 'MTBF']} />
+                        <Bar dataKey="mtbfDays" name="MTBF" radius={[6, 6, 0, 0]} fill={theme.palette.success.main} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </Box>
+                </CardContent>
+              </Card>
+            </Grid>
+
+            <Grid size={{ xs: 12, lg: 7 }}>
+              <Card>
+                <CardContent>
+                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
+                    Monthly Failure Count (Last 6 Months)
+                  </Typography>
+                  <Box sx={{ height: 300 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={monthlyFailureCountData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />
+                        <XAxis dataKey="month" stroke={theme.palette.text.secondary} />
+                        <YAxis allowDecimals={false} stroke={theme.palette.text.secondary} />
+                        <Tooltip formatter={(value: number) => [value, 'Failures']} />
+                        <Bar dataKey="failures" fill={theme.palette.primary.main} radius={[6, 6, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </Box>
+                </CardContent>
+              </Card>
+            </Grid>
+
+            <Grid size={{ xs: 12, lg: 5 }}>
+              <Card>
+                <CardContent>
+                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
+                    Top 5 Failing Assets
+                  </Typography>
+                  <TableContainer component={Paper} variant="outlined">
+                    <Table size="small">
+                      <TableHead>
+                        <TableRow>
+                          <TableCell>Asset</TableCell>
+                          <TableCell>Type</TableCell>
+                          <TableCell align="right">Failures</TableCell>
+                          <TableCell align="right">MTBF</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {topFailingAssets.map((asset) => (
+                          <TableRow key={asset.id}>
+                            <TableCell>
+                              <Typography variant="body2" fontWeight={600}>
+                                {asset.name}
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                {asset.lastFailureDate
+                                  ? `Last: ${format(new Date(asset.lastFailureDate), 'MMM d, yyyy')}`
+                                  : 'No failure date'}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>{asset.type}</TableCell>
+                            <TableCell align="right">{asset.failures}</TableCell>
+                            <TableCell align="right">{asset.mtbfDays ? `${asset.mtbfDays}d` : '-'}</TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
