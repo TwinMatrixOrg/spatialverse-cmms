@@ -3,11 +3,21 @@ import { Box, Typography, Card, CardContent, useTheme, Chip, IconButton, Tooltip
 import { Fullscreen as FullscreenIcon, FullscreenExit as FullscreenExitIcon } from '@mui/icons-material';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
+import { useThemeContext } from '../../theme/ThemeContext';
 import { assets, sites, getAssetById, getSiteById, Asset } from '../../data/mockData';
 import { useStore } from '../../store/useStore';
 
+const MAPTILER_KEY = '12H5hrITUbJ1sDrVPqkq';
+const MAP_STYLE_DARK = `https://api.maptiler.com/maps/streets-v2-dark/style.json?key=${MAPTILER_KEY}`;
+const MAP_STYLE_LIGHT = {
+  version: 8 as const,
+  sources: { osm: { type: 'raster' as const, tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'], tileSize: 256, attribution: '&copy; OpenStreetMap contributors' } },
+  layers: [{ id: 'osm', type: 'raster' as const, source: 'osm' }],
+};
+
 export default function AssetMap() {
   const theme = useTheme();
+  const { mode: themeMode } = useThemeContext();
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
   const markersRef = useRef<maplibregl.Marker[]>([]);
@@ -29,26 +39,7 @@ export default function AssetMap() {
 
     map.current = new maplibregl.Map({
       container: mapContainer.current,
-      style: {
-        version: 8,
-        sources: {
-          'osm-tiles': {
-            type: 'raster',
-            tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
-            tileSize: 256,
-            attribution: '&copy; OpenStreetMap contributors',
-          },
-        },
-        layers: [
-          {
-            id: 'osm-tiles',
-            type: 'raster',
-            source: 'osm-tiles',
-            minzoom: 0,
-            maxzoom: 19,
-          },
-        ],
-      },
+      style: themeMode === 'dark' ? MAP_STYLE_DARK : MAP_STYLE_LIGHT,
       center: [center?.lng || 101.6773, center?.lat || 3.1178],
       zoom: selectedSiteId ? 16 : 11,
     });
@@ -61,6 +52,14 @@ export default function AssetMap() {
       map.current?.remove();
     };
   }, [selectedSiteId]);
+
+  // Swap map style when theme changes
+  useEffect(() => {
+    const m = map.current;
+    if (!m) return;
+    const newStyle = themeMode === 'dark' ? MAP_STYLE_DARK : MAP_STYLE_LIGHT;
+    m.setStyle(newStyle as Parameters<typeof m.setStyle>[0]);
+  }, [themeMode]);
 
   // Add markers for assets
   useEffect(() => {
