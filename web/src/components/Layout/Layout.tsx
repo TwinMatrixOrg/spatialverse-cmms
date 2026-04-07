@@ -22,10 +22,21 @@ export default function Layout() {
     }
   };
 
-  const drawerWidth = sidebarOpen ? DRAWER_WIDTH : COLLAPSED_WIDTH;
-
   return (
-    <Box sx={{ display: 'flex', minHeight: '100vh' }}>
+    <Box
+      sx={{
+        display: 'flex',
+        minHeight: '100vh',
+        overflowX: 'hidden',
+        '& .MuiButton-root, & .MuiToggleButton-root, & .MuiListItemButton-root': {
+          minHeight: 44,
+        },
+        '& .MuiIconButton-root': {
+          width: 44,
+          height: 44,
+        },
+      }}
+    >
       <Sidebar
         open={isMobile ? mobileOpen : sidebarOpen}
         onClose={() => isMobile ? setMobileOpen(false) : setSidebarOpen(false)}
@@ -42,15 +53,17 @@ export default function Layout() {
           minHeight: '100vh',
           minWidth: 0,
           overflow: 'hidden',
+          overflowX: 'hidden',
         }}
       >
-        <TopBar onMenuClick={handleDrawerToggle} />
+        <TopBar onMenuClick={handleDrawerToggle} isMobile={isMobile} />
         <Box
           sx={{
             flexGrow: 1,
             p: { xs: 1.5, sm: 2 },
             backgroundColor: 'background.default',
             overflow: 'auto',
+            overflowX: 'hidden',
           }}
         >
           <Outlet />

@@ -245,8 +245,8 @@ function KanbanColumn({
   return (
     <Box
       sx={{
-        width: 280,
-        minWidth: 280,
+        width: { xs: 260, sm: 280 },
+        minWidth: { xs: 260, sm: 280 },
         flexShrink: 0,
         display: 'flex',
         flexDirection: 'column',
@@ -387,10 +387,17 @@ export default function WorkOrders() {
   const activeWO = activeId ? localWorkOrders.find(wo => wo.id === activeId) : null;
 
   return (
-    <Box sx={{ height: 'calc(100vh - 140px)', display: 'flex', flexDirection: 'column' }}>
+    <Box
+      sx={{
+        height: 'calc(100vh - 140px)',
+        display: 'flex',
+        flexDirection: 'column',
+        overflowX: 'hidden',
+      }}
+    >
       {/* Header */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4" sx={{ fontWeight: 700 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, gap: 1, flexWrap: 'wrap' }}>
+        <Typography variant="h4" sx={{ fontWeight: 700, fontSize: { xs: '1.65rem', sm: '2rem' } }}>
           Work Orders
         </Typography>
         <Button
@@ -409,7 +416,7 @@ export default function WorkOrders() {
           placeholder="Search work orders..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          sx={{ minWidth: 250 }}
+          sx={{ minWidth: { xs: '100%', sm: 250 }, flex: { xs: '1 1 100%', sm: '0 1 auto' } }}
           InputProps={{
             startAdornment: (
               <InputAdornment position="start">
@@ -418,7 +425,7 @@ export default function WorkOrders() {
             ),
           }}
         />
-        <FormControl size="small" sx={{ minWidth: 120 }}>
+        <FormControl size="small" sx={{ minWidth: { xs: 140, sm: 120 } }}>
           <InputLabel>Priority</InputLabel>
           <Select
             value={priorityFilter}
@@ -438,11 +445,12 @@ export default function WorkOrders() {
           exclusive
           onChange={(_, value) => value && setViewMode(value)}
           size="small"
+          sx={{ width: { xs: '100%', sm: 'auto' } }}
         >
-          <ToggleButton value="kanban">
+          <ToggleButton value="kanban" sx={{ flex: { xs: 1, sm: 'initial' } }}>
             <KanbanIcon sx={{ mr: 0.5 }} /> Kanban
           </ToggleButton>
-          <ToggleButton value="list">
+          <ToggleButton value="list" sx={{ flex: { xs: 1, sm: 'initial' } }}>
             <ListIcon sx={{ mr: 0.5 }} /> List
           </ToggleButton>
         </ToggleButtonGroup>
@@ -464,6 +472,7 @@ export default function WorkOrders() {
               overflowX: 'auto',
               overflowY: 'hidden',
               pb: 1,
+              WebkitOverflowScrolling: 'touch',
               '& > *': { flexShrink: 0 },
             }}
           >
@@ -484,8 +493,8 @@ export default function WorkOrders() {
 
       {/* List View */}
       {viewMode === 'list' && (
-        <TableContainer component={Paper} sx={{ flex: 1 }}>
-          <Table stickyHeader>
+        <TableContainer component={Paper} sx={{ flex: 1, overflowX: 'auto', maxWidth: '100%' }}>
+          <Table stickyHeader size="small">
             <TableHead>
               <TableRow>
                 <TableCell>WO #</TableCell>
@@ -493,8 +502,8 @@ export default function WorkOrders() {
                 <TableCell>Fault Type</TableCell>
                 <TableCell>Priority</TableCell>
                 <TableCell>Status</TableCell>
-                <TableCell>SLA</TableCell>
-                <TableCell>Assignee</TableCell>
+                <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>SLA</TableCell>
+                <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>Assignee</TableCell>
                 <TableCell>Site</TableCell>
               </TableRow>
             </TableHead>
@@ -544,10 +553,10 @@ export default function WorkOrders() {
                         }}
                       />
                     </TableCell>
-                    <TableCell>
+                    <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>
                       {showSLA && <SLAChip deadline={wo.slaDeadline} />}
                     </TableCell>
-                    <TableCell>
+                    <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>
                       {assignee ? `${assignee.firstName} ${assignee.lastName}` : '-'}
                     </TableCell>
                     <TableCell>{site?.name}</TableCell>

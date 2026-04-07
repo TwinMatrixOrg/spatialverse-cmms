@@ -388,8 +388,8 @@ export default function Dashboard() {
   }, [filteredAssets, selectedSiteId, workOrders, pmSchedules]);
 
   return (
-    <Box>
-      <Typography variant="h4" sx={{ fontWeight: 700, mb: 2 }}>
+    <Box sx={{ overflowX: 'hidden' }}>
+      <Typography variant="h4" sx={{ fontWeight: 700, mb: 2, fontSize: { xs: '1.65rem', sm: '2rem' } }}>
         Dashboard
       </Typography>
 
@@ -407,7 +407,17 @@ export default function Dashboard() {
       ))}
 
       {/* KPI Cards */}
-      <Box sx={{ display: 'flex', gap: 2, mb: 3, flexWrap: 'nowrap' }}>
+      <Box
+        sx={{
+          display: 'grid',
+          gap: 2,
+          mb: 3,
+          gridTemplateColumns: {
+            xs: 'repeat(2, minmax(0, 1fr))',
+            md: 'repeat(5, minmax(0, 1fr))',
+          },
+        }}
+      >
         {[
           { title: 'Open Work Orders', value: kpis.openWorkOrders, icon: <WorkOrderIcon />, color: theme.palette.primary.main },
           { title: 'Overdue WOs', value: kpis.overdueWorkOrders, icon: <WarningIcon />, color: theme.palette.error.main },
@@ -415,13 +425,13 @@ export default function Dashboard() {
           { title: 'PM Compliance', value: `${kpis.pmComplianceRate}%`, icon: <CheckIcon />, color: theme.palette.success.main },
           { title: 'MTTR', value: `${kpis.mttr}h`, subtitle: 'Avg repair time', icon: <BuildIcon />, color: theme.palette.info.main },
         ].map((kpi) => (
-          <Box key={kpi.title} sx={{ flex: '1 1 0', minWidth: 0 }}>
+          <Box key={kpi.title} sx={{ minWidth: 0 }}>
             <KPICard {...kpi} />
           </Box>
         ))}
       </Box>
 
-      <Grid container spacing={3}>
+      <Grid container spacing={{ xs: 2, md: 3 }}>
         {/* WO Status Chart */}
         <Grid size={{ xs: 12, md: 4 }}>
           <Card sx={{ height: 360 }}>

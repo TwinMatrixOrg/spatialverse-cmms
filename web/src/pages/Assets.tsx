@@ -246,10 +246,17 @@ export default function Assets() {
   }, [filteredAssets, viewMode, workOrders, pmSchedules]);
 
   return (
-    <Box sx={{ height: 'calc(100vh - 140px)', display: 'flex', flexDirection: 'column' }}>
+    <Box
+      sx={{
+        height: 'calc(100vh - 140px)',
+        display: 'flex',
+        flexDirection: 'column',
+        overflowX: 'hidden',
+      }}
+    >
       {/* Header */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4" sx={{ fontWeight: 700 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, gap: 1, flexWrap: 'wrap' }}>
+        <Typography variant="h4" sx={{ fontWeight: 700, fontSize: { xs: '1.65rem', sm: '2rem' } }}>
           Assets
         </Typography>
         <Button variant="contained" startIcon={<AddIcon />}>
@@ -264,7 +271,7 @@ export default function Assets() {
           placeholder="Search assets..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          sx={{ minWidth: 220 }}
+          sx={{ minWidth: { xs: '100%', sm: 220 }, flex: { xs: '1 1 100%', sm: '0 1 auto' } }}
           InputProps={{
             startAdornment: (
               <InputAdornment position="start">
@@ -319,34 +326,39 @@ export default function Assets() {
           exclusive
           onChange={(_, value) => value && setViewMode(value)}
           size="small"
+          sx={{ width: { xs: '100%', sm: 'auto' } }}
         >
-          <ToggleButton value="split">Split</ToggleButton>
-          <ToggleButton value="table">
+          <ToggleButton value="split" sx={{ flex: { xs: 1, sm: 'initial' } }}>Split</ToggleButton>
+          <ToggleButton value="table" sx={{ flex: { xs: 1, sm: 'initial' } }}>
             <ListIcon sx={{ mr: 0.5 }} /> Table
           </ToggleButton>
-          <ToggleButton value="map">
+          <ToggleButton value="map" sx={{ flex: { xs: 1, sm: 'initial' } }}>
             <MapIcon sx={{ mr: 0.5 }} /> Map
           </ToggleButton>
         </ToggleButtonGroup>
       </Box>
 
       {/* Content */}
-      <Box sx={{ flex: 1, display: 'flex', gap: 2, overflow: 'hidden' }}>
+      <Box sx={{ flex: 1, display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 2, overflow: 'hidden' }}>
         {/* Table */}
         {(viewMode === 'split' || viewMode === 'table') && (
           <TableContainer
             component={Paper}
-            sx={{ flex: viewMode === 'split' ? '0 0 55%' : 1, overflow: 'auto' }}
+            sx={{
+              flex: viewMode === 'split' ? { xs: '1 1 56%', md: '0 0 55%' } : 1,
+              overflow: 'auto',
+              minHeight: viewMode === 'split' ? { xs: 260, md: 0 } : 0,
+            }}
           >
             <Table stickyHeader size="small">
               <TableHead>
                 <TableRow>
                   <TableCell>Asset</TableCell>
                   <TableCell>Type</TableCell>
-                  <TableCell>Location</TableCell>
+                  <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>Location</TableCell>
                   <TableCell>Health</TableCell>
                   <TableCell>Open WOs</TableCell>
-                  <TableCell>Last Service</TableCell>
+                  <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>Last Service</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -385,7 +397,7 @@ export default function Assets() {
                           }}
                         />
                       </TableCell>
-                      <TableCell>
+                      <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>
                         <Typography variant="body2">{site?.name}</Typography>
                         <Typography variant="caption" color="text.secondary">
                           {asset.floor} {asset.zone && `- ${asset.zone}`}
@@ -426,7 +438,7 @@ export default function Assets() {
                           </Typography>
                         )}
                       </TableCell>
-                      <TableCell>
+                      <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>
                         <Typography variant="body2">
                           {asset.lastServiceDate
                             ? format(new Date(asset.lastServiceDate), 'MMM d, yyyy')
@@ -443,7 +455,13 @@ export default function Assets() {
 
         {/* Map */}
         {(viewMode === 'split' || viewMode === 'map') && (
-          <Card sx={{ flex: viewMode === 'split' ? '0 0 45%' : 1, overflow: 'hidden' }}>
+          <Card
+            sx={{
+              flex: viewMode === 'split' ? { xs: '1 1 44%', md: '0 0 45%' } : 1,
+              overflow: 'hidden',
+              minHeight: { xs: 240, md: 0 },
+            }}
+          >
             <Box ref={mapContainer} sx={{ width: '100%', height: '100%' }} />
           </Card>
         )}

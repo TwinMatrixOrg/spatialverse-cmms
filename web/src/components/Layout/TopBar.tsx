@@ -39,9 +39,10 @@ import { sites } from '../../data/mockData';
 
 interface TopBarProps {
   onMenuClick: () => void;
+  isMobile: boolean;
 }
 
-export default function TopBar({ onMenuClick }: TopBarProps) {
+export default function TopBar({ onMenuClick, isMobile }: TopBarProps) {
   const theme = useTheme();
   const { mode, toggleTheme } = useThemeContext();
   const {
@@ -88,18 +89,31 @@ export default function TopBar({ onMenuClick }: TopBarProps) {
         borderColor: 'divider',
       }}
     >
-      <Toolbar sx={{ justifyContent: 'space-between' }}>
-        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+      <Toolbar
+        sx={{
+          justifyContent: 'space-between',
+          gap: 1,
+          px: { xs: 1, sm: 2 },
+          minHeight: { xs: 64, sm: 68 },
+        }}
+      >
+        <Box sx={{ display: 'flex', alignItems: 'center', minWidth: 0, flex: 1 }}>
           <IconButton
             color="inherit"
             edge="start"
             onClick={onMenuClick}
-            sx={{ mr: 2, color: 'text.primary' }}
+            sx={{ mr: { xs: 1, sm: 2 }, color: 'text.primary' }}
           >
             <MenuIcon />
           </IconButton>
 
-          <FormControl size="small" sx={{ minWidth: 200 }}>
+          <FormControl
+            size="small"
+            sx={{
+              minWidth: { xs: 140, sm: 200 },
+              maxWidth: { xs: 190, sm: 280 },
+            }}
+          >
             <Select
               value={selectedSiteId || 'all'}
               onChange={handleSiteChange}
@@ -112,9 +126,9 @@ export default function TopBar({ onMenuClick }: TopBarProps) {
                 },
               }}
               renderValue={(selected) => (
-                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', minWidth: 0 }}>
                   <LocationIcon sx={{ mr: 1, fontSize: 20, color: 'primary.main' }} />
-                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                  <Typography variant="body2" sx={{ fontWeight: 500 }} noWrap>
                     {selected === 'all' ? 'All Sites' : sites.find((site) => site.id === selected)?.name}
                   </Typography>
                 </Box>
@@ -139,7 +153,7 @@ export default function TopBar({ onMenuClick }: TopBarProps) {
           </FormControl>
         </Box>
 
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 0.25, sm: 1 }, flexShrink: 0 }}>
           <Tooltip title={mode === 'dark' ? 'Light mode' : 'Dark mode'}>
             <IconButton onClick={toggleTheme} sx={{ color: 'text.primary' }}>
               {mode === 'dark' ? <LightModeIcon /> : <DarkModeIcon />}
@@ -211,7 +225,14 @@ export default function TopBar({ onMenuClick }: TopBarProps) {
           transformOrigin={{ horizontal: 'right', vertical: 'top' }}
           anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
         >
-          <Box sx={{ width: 380, maxHeight: 460, display: 'flex', flexDirection: 'column' }}>
+          <Box
+            sx={{
+              width: { xs: 'min(92vw, 360px)', sm: 380 },
+              maxHeight: 460,
+              display: 'flex',
+              flexDirection: 'column',
+            }}
+          >
             <Box sx={{ px: 2, py: 1.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
@@ -219,7 +240,12 @@ export default function TopBar({ onMenuClick }: TopBarProps) {
                 </Typography>
                 <Chip size="small" color="error" label={`${unreadNotifications} unread`} />
               </Box>
-              <Button size="small" onClick={markAllNotificationsRead} disabled={unreadNotifications === 0}>
+              <Button
+                size="small"
+                onClick={markAllNotificationsRead}
+                disabled={unreadNotifications === 0}
+                sx={{ minWidth: isMobile ? 'auto' : undefined }}
+              >
                 Mark all read
               </Button>
             </Box>
