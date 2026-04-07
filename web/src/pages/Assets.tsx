@@ -44,16 +44,16 @@ import {
 } from '@mui/icons-material';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { useStore } from '../store/useStore';
+import { useStore, AssetHealthBand } from '../store/useStore';
 import {
   assets,
-  workOrders,
-  pmSchedules,
-  getAssetById,
   getSiteById,
   sites,
   Asset,
   AssetType,
+  WorkOrder,
+  PMSchedule,
+  calculateAssetHealth,
 } from '../data/mockData';
 import { format } from 'date-fns';
 
@@ -74,6 +74,18 @@ const healthColors = {
   good: '#66BB6A',
 };
 
+const getHealthStatus = (healthScore: number) => {
+  if (healthScore < 40) return 'critical';
+  if (healthScore < 70) return 'warning';
+  return 'good';
+};
+
+const getHealthBand = (healthScore: number): Exclude<AssetHealthBand, 'all'> => {
+  if (healthScore < 40) return 'critical';
+  if (healthScore < 70) return 'at_risk';
+  return 'healthy';
+};
+
 const typeColors: Record<AssetType, string> = {
   HVAC: '#29B6F6',
   Electrical: '#FFA726',
@@ -87,7 +99,13 @@ const typeColors: Record<AssetType, string> = {
 
 export default function Assets() {
   const theme = useTheme();
-  const { selectedSiteId } = useStore();
+  const {
+    selectedSiteId,
+    workOrders,
+    pmSchedules,
+    assetHealthBandFilter,
+    setAssetHealthBandFilter,
+  } = useStore();
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
   const [viewMode, setViewMode] = useState<'split' | 'table' | 'map'>('split');
@@ -96,11 +114,19 @@ export default function Assets() {
   const [healthFilter, setHealthFilter] = useState<'all' | 'critical' | 'warning' | 'good'>('all');
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
 
+  const getCalculatedHealthScore = (assetId: string) =>
+    calculateAssetHealth(assetId, workOrders, pmSchedules);
+
   const filteredAssets = useMemo(() => {
     return assets.filter(asset => {
+      const healthScore = getCalculatedHealthScore(asset.id);
+      const healthStatus = getHealthStatus(healthScore);
+      const healthBand = getHealthBand(healthScore);
+
       if (selectedSiteId && asset.siteId !== selectedSiteId) return false;
       if (typeFilter !== 'all' && asset.type !== typeFilter) return false;
-      if (healthFilter !== 'all' && asset.healthStatus !== healthFilter) return false;
+      if (healthFilter !== 'all' && healthStatus !== healthFilter) return false;
+      if (assetHealthBandFilter !== 'all' && assetHealthBandFilter !== healthBand) return false;
       if (searchQuery) {
         const search = searchQuery.toLowerCase();
         return (
@@ -111,7 +137,15 @@ export default function Assets() {
       }
       return true;
     });
-  }, [selectedSiteId, typeFilter, healthFilter, searchQuery]);
+  }, [
+    selectedSiteId,
+    typeFilter,
+    healthFilter,
+    searchQuery,
+    assetHealthBandFilter,
+    workOrders,
+    pmSchedules,
+  ]);
 
   // Initialize map
   useEffect(() => {
@@ -165,6 +199,13 @@ export default function Assets() {
 
     // Add new markers
     filteredAssets.forEach(asset => {
+      const healthScore = getCalculatedHealthScore(asset.id);
+      const healthStatus = getHealthStatus(healthScore);
+      const openWorkOrderCount = workOrders.filter(
+        (workOrder) =>
+          workOrder.assetId === asset.id && !['resolved', 'closed'].includes(workOrder.status)
+      ).length;
+
       const markerEl = document.createElement('div');
       markerEl.className = 'asset-marker';
       markerEl.style.width = '28px';
@@ -173,7 +214,7 @@ export default function Assets() {
       markerEl.style.border = '3px solid white';
       markerEl.style.boxShadow = '0 2px 8px rgba(0,0,0,0.3)';
       markerEl.style.cursor = 'pointer';
-      markerEl.style.backgroundColor = healthColors[asset.healthStatus];
+      markerEl.style.backgroundColor = healthColors[healthStatus];
 
       markerEl.onclick = () => setSelectedAsset(asset);
 
@@ -182,8 +223,9 @@ export default function Assets() {
           <strong style="font-size: 14px;">${asset.name}</strong>
           <div style="font-size: 12px; color: #666; margin-top: 2px;">${asset.type}</div>
           <div style="font-size: 12px; margin-top: 4px;">
-            Health: <span style="color: ${healthColors[asset.healthStatus]}; font-weight: 600;">${asset.healthScore}%</span>
+            Health: <span style="color: ${healthColors[healthStatus]}; font-weight: 600;">${healthScore}%</span>
           </div>
+          ${openWorkOrderCount > 0 ? `<div style="font-size: 12px; color: #EF5350;">Open WOs: ${openWorkOrderCount}</div>` : ''}
         </div>
       `);
 
@@ -201,7 +243,7 @@ export default function Assets() {
       });
       map.current.fitBounds(bounds, { padding: 50 });
     }
-  }, [filteredAssets, viewMode]);
+  }, [filteredAssets, viewMode, workOrders, pmSchedules]);
 
   return (
     <Box sx={{ height: 'calc(100vh - 140px)', display: 'flex', flexDirection: 'column' }}>
@@ -263,6 +305,14 @@ export default function Assets() {
           label={`${filteredAssets.length} assets`}
           sx={{ alignSelf: 'center' }}
         />
+        {assetHealthBandFilter !== 'all' && (
+          <Chip
+            label={`Dashboard filter: ${assetHealthBandFilter.replace('_', ' ')}`}
+            color="primary"
+            onDelete={() => setAssetHealthBandFilter('all')}
+            sx={{ textTransform: 'capitalize' }}
+          />
+        )}
         <Box sx={{ flexGrow: 1 }} />
         <ToggleButtonGroup
           value={viewMode}
@@ -302,6 +352,13 @@ export default function Assets() {
               <TableBody>
                 {filteredAssets.map((asset) => {
                   const site = getSiteById(asset.siteId);
+                  const healthScore = getCalculatedHealthScore(asset.id);
+                  const healthStatus = getHealthStatus(healthScore);
+                  const openWorkOrderCount = workOrders.filter(
+                    (workOrder) =>
+                      workOrder.assetId === asset.id && !['resolved', 'closed'].includes(workOrder.status)
+                  ).length;
+
                   return (
                     <TableRow
                       key={asset.id}
@@ -338,28 +395,28 @@ export default function Assets() {
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                           <LinearProgress
                             variant="determinate"
-                            value={asset.healthScore}
+                            value={healthScore}
                             sx={{
                               width: 60,
                               height: 6,
                               borderRadius: 3,
-                              backgroundColor: alpha(healthColors[asset.healthStatus], 0.2),
+                              backgroundColor: alpha(healthColors[healthStatus], 0.2),
                               '& .MuiLinearProgress-bar': {
-                                backgroundColor: healthColors[asset.healthStatus],
+                                backgroundColor: healthColors[healthStatus],
                                 borderRadius: 3,
                               },
                             }}
                           />
-                          <Typography variant="caption" fontWeight={600} color={healthColors[asset.healthStatus]}>
-                            {asset.healthScore}%
+                          <Typography variant="caption" fontWeight={600} color={healthColors[healthStatus]}>
+                            {healthScore}%
                           </Typography>
                         </Box>
                       </TableCell>
                       <TableCell>
-                        {asset.openWorkOrdersCount > 0 ? (
+                        {openWorkOrderCount > 0 ? (
                           <Chip
                             size="small"
-                            label={asset.openWorkOrdersCount}
+                            label={openWorkOrderCount}
                             color="error"
                             sx={{ height: 22, minWidth: 28 }}
                           />
@@ -402,19 +459,36 @@ export default function Assets() {
         }}
       >
         {selectedAsset && (
-          <AssetDetailPanel asset={selectedAsset} onClose={() => setSelectedAsset(null)} />
+          <AssetDetailPanel
+            asset={selectedAsset}
+            workOrders={workOrders}
+            pmSchedules={pmSchedules}
+            onClose={() => setSelectedAsset(null)}
+          />
         )}
       </Drawer>
     </Box>
   );
 }
 
-function AssetDetailPanel({ asset, onClose }: { asset: Asset; onClose: () => void }) {
+function AssetDetailPanel({
+  asset,
+  workOrders,
+  pmSchedules,
+  onClose,
+}: {
+  asset: Asset;
+  workOrders: WorkOrder[];
+  pmSchedules: PMSchedule[];
+  onClose: () => void;
+}) {
   const theme = useTheme();
   const [tab, setTab] = useState(0);
   const site = getSiteById(asset.siteId);
   const assetWOs = workOrders.filter(wo => wo.assetId === asset.id);
   const assetPMs = pmSchedules.filter(pm => pm.assetId === asset.id);
+  const healthScore = calculateAssetHealth(asset.id, workOrders, pmSchedules);
+  const healthStatus = getHealthStatus(healthScore);
 
   return (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -453,19 +527,19 @@ function AssetDetailPanel({ asset, onClose }: { asset: Asset; onClose: () => voi
           <Typography variant="body2" color="text.secondary">
             Health Score
           </Typography>
-          <Typography variant="h5" fontWeight={700} color={healthColors[asset.healthStatus]}>
-            {asset.healthScore}%
+          <Typography variant="h5" fontWeight={700} color={healthColors[healthStatus]}>
+            {healthScore}%
           </Typography>
         </Box>
         <LinearProgress
           variant="determinate"
-          value={asset.healthScore}
+          value={healthScore}
           sx={{
             height: 8,
             borderRadius: 4,
-            backgroundColor: alpha(healthColors[asset.healthStatus], 0.2),
+            backgroundColor: alpha(healthColors[healthStatus], 0.2),
             '& .MuiLinearProgress-bar': {
-              backgroundColor: healthColors[asset.healthStatus],
+              backgroundColor: healthColors[healthStatus],
               borderRadius: 4,
             },
           }}

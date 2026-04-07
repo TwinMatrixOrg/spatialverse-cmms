@@ -9,6 +9,14 @@ import {
   useTheme,
   Tabs,
   Tab,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  Chip,
 } from '@mui/material';
 import {
   LineChart,
@@ -58,6 +66,32 @@ const faultCategories = [
 
 const COLORS = ['#29B6F6', '#FFA726', '#66BB6A', '#AB47BC', '#EF5350', '#78909C'];
 
+const pmComplianceTrend = [
+  { month: 'Nov', compliance: 60 },
+  { month: 'Dec', compliance: 63 },
+  { month: 'Jan', compliance: 67 },
+  { month: 'Feb', compliance: 71 },
+  { month: 'Mar', compliance: 75 },
+  { month: 'Apr', compliance: 78 },
+];
+
+const overduePMByCategory = [
+  { category: 'HVAC', overdue: 4 },
+  { category: 'Electrical', overdue: 2 },
+  { category: 'Plumbing', overdue: 1 },
+  { category: 'Fire Safety', overdue: 0 },
+  { category: 'Elevator', overdue: 1 },
+];
+
+const overduePMRows = [
+  { asset: 'AHU-PKL-02', location: 'Pavilion KL - B2', daysOverdue: 14, assignedTeam: 'HVAC Team A' },
+  { asset: 'Chiller-SP-02', location: 'Sunway Pyramid - Plant Room', daysOverdue: 9, assignedTeam: 'HVAC Team B' },
+  { asset: 'MDB-MV-01', location: 'Mid Valley Megamall - B3', daysOverdue: 7, assignedTeam: 'Electrical Team A' },
+  { asset: 'Lift-PKL-02', location: 'Pavilion KL - Main Lobby', daysOverdue: 5, assignedTeam: 'Vertical Transport Team' },
+  { asset: 'WaterPump-PKL-01', location: 'Pavilion KL - Pump Room', daysOverdue: 4, assignedTeam: 'Plumbing Team A' },
+  { asset: 'Fire Suppression Zone-C', location: 'Pavilion KL - L4', daysOverdue: 3, assignedTeam: 'Fire Safety Team' },
+];
+
 const formatDateForInput = (date: Date): string => {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -94,6 +128,11 @@ export default function Reports() {
   const topPerformingContractor = [...contractors].sort(
     (a, b) => b.performanceScore - a.performanceScore
   )[0];
+
+  const totalPPMTasksThisMonth = 36;
+  const completedPPMTasksThisMonth = 28;
+  const overduePPMTasksThisMonth = 8;
+  const ppmComplianceThisMonth = Math.round((completedPPMTasksThisMonth / totalPPMTasksThisMonth) * 100);
 
   return (
       <Box>
@@ -202,6 +241,7 @@ export default function Reports() {
           <Tab label="MTTR Analysis" />
           <Tab label="Fault Categories" />
           <Tab label="Contractor Performance" />
+          <Tab label="PPM Compliance" />
         </Tabs>
 
         {/* Work Orders Tab */}
@@ -422,6 +462,148 @@ export default function Reports() {
               </Box>
             </CardContent>
           </Card>
+        )}
+
+        {activeTab === 4 && (
+          <Grid container spacing={3}>
+            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+              <Card>
+                <CardContent>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                    Total PPM Tasks (This Month)
+                  </Typography>
+                  <Typography variant="h4" sx={{ fontWeight: 700 }}>
+                    {totalPPMTasksThisMonth}
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+              <Card>
+                <CardContent>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                    Completed
+                  </Typography>
+                  <Typography variant="h4" sx={{ fontWeight: 700, color: 'success.main' }}>
+                    {completedPPMTasksThisMonth}
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+              <Card>
+                <CardContent>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                    Overdue
+                  </Typography>
+                  <Typography variant="h4" sx={{ fontWeight: 700, color: 'error.main' }}>
+                    {overduePPMTasksThisMonth}
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+              <Card>
+                <CardContent>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                    Compliance %
+                  </Typography>
+                  <Typography variant="h4" sx={{ fontWeight: 700, color: 'primary.main' }}>
+                    {ppmComplianceThisMonth}%
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+
+            <Grid size={{ xs: 12, lg: 7 }}>
+              <Card>
+                <CardContent>
+                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
+                    PM Compliance % (Last 6 Months)
+                  </Typography>
+                  <Box sx={{ height: 300 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={pmComplianceTrend}>
+                        <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />
+                        <XAxis dataKey="month" stroke={theme.palette.text.secondary} />
+                        <YAxis domain={[50, 85]} stroke={theme.palette.text.secondary} unit="%" />
+                        <Tooltip />
+                        <Line
+                          type="monotone"
+                          dataKey="compliance"
+                          stroke={theme.palette.primary.main}
+                          strokeWidth={3}
+                          dot={{ fill: theme.palette.primary.main, r: 4 }}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </Box>
+                </CardContent>
+              </Card>
+            </Grid>
+
+            <Grid size={{ xs: 12, lg: 5 }}>
+              <Card>
+                <CardContent>
+                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
+                    Overdue PMs by Asset Category
+                  </Typography>
+                  <Box sx={{ height: 300 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={overduePMByCategory}>
+                        <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />
+                        <XAxis dataKey="category" stroke={theme.palette.text.secondary} />
+                        <YAxis allowDecimals={false} stroke={theme.palette.text.secondary} />
+                        <Tooltip />
+                        <Bar dataKey="overdue" fill={theme.palette.error.main} radius={[6, 6, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </Box>
+                </CardContent>
+              </Card>
+            </Grid>
+
+            <Grid size={{ xs: 12 }}>
+              <Card>
+                <CardContent>
+                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
+                    Overdue PM Task List
+                  </Typography>
+                  <TableContainer component={Paper} variant="outlined">
+                    <Table size="small">
+                      <TableHead>
+                        <TableRow>
+                          <TableCell>Asset</TableCell>
+                          <TableCell>Location</TableCell>
+                          <TableCell>Days Overdue</TableCell>
+                          <TableCell>Assigned Team</TableCell>
+                          <TableCell>Status</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {overduePMRows.map((row) => (
+                          <TableRow key={`${row.asset}-${row.location}`}>
+                            <TableCell>{row.asset}</TableCell>
+                            <TableCell>{row.location}</TableCell>
+                            <TableCell>{row.daysOverdue}</TableCell>
+                            <TableCell>{row.assignedTeam}</TableCell>
+                            <TableCell>
+                              <Chip
+                                size="small"
+                                color="error"
+                                label="Overdue"
+                                sx={{ fontWeight: 600 }}
+                              />
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                </CardContent>
+              </Card>
+            </Grid>
+          </Grid>
         )}
       </Box>
   );

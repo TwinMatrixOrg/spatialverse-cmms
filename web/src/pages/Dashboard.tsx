@@ -6,15 +6,17 @@ import {
   Grid2 as Grid,
   Typography,
   Chip,
+  Button,
   Avatar,
   List,
   ListItem,
   ListItemText,
   ListItemAvatar,
   Divider,
+  Alert,
+  Snackbar,
   useTheme,
   alpha,
-  LinearProgress,
 } from '@mui/material';
 import {
   Assignment as WorkOrderIcon,
@@ -24,24 +26,28 @@ import {
   AccessTime as TimeIcon,
   Build as BuildIcon,
   ErrorOutline as ErrorIcon,
+  AddTask as AddTaskIcon,
 } from '@mui/icons-material';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, CartesianGrid, XAxis, YAxis } from 'recharts';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { useStore } from '../store/useStore';
 import {
   getDashboardKPIs,
   getWorkOrdersByStatusCount,
-  workOrders,
   assets,
-  pmSchedules,
   alerts,
   getUserById,
   getAssetById,
   getSiteById,
   sites,
+  calculateAssetHealth,
 } from '../data/mockData';
-import { formatDistanceToNow, differenceInHours, differenceInMinutes, addDays } from 'date-fns';
+import {
+  addDays,
+  differenceInCalendarDays,
+  format,
+} from 'date-fns';
 
 const priorityColors = {
   P1: '#EF5350',
@@ -63,6 +69,26 @@ const healthColors = {
   critical: '#EF5350',
   warning: '#FFA726',
   good: '#66BB6A',
+};
+
+const getHealthStatus = (healthScore: number) => {
+  if (healthScore < 40) return 'critical';
+  if (healthScore < 70) return 'warning';
+  return 'good';
+};
+
+const getPMUrgency = (nextDueDate: string) => {
+  const daysUntilDue = differenceInCalendarDays(new Date(nextDueDate), new Date());
+  if (daysUntilDue < 0) {
+    return { color: '#E53935', label: 'Overdue' };
+  }
+  if (daysUntilDue <= 1) {
+    return {
+      color: '#FB8C00',
+      label: daysUntilDue === 0 ? 'Due Today' : 'Due Tomorrow',
+    };
+  }
+  return { color: '#43A047', label: 'Upcoming' };
 };
 
 function useSLACountdown(deadline: string) {
@@ -179,10 +205,18 @@ export default function Dashboard() {
   const theme = useTheme();
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
-  const { selectedSiteId } = useStore();
+  const {
+    selectedSiteId,
+    workOrders,
+    pmSchedules,
+    notifications,
+    generateWOFromPMSchedule,
+    setAssetHealthBandFilter,
+  } = useStore();
+  const [snackbarMessage, setSnackbarMessage] = useState('');
 
-  const kpis = getDashboardKPIs(selectedSiteId || undefined);
-  const woByStatus = getWorkOrdersByStatusCount(selectedSiteId || undefined);
+  const kpis = getDashboardKPIs(selectedSiteId || undefined, workOrders, assets, pmSchedules);
+  const woByStatus = getWorkOrdersByStatusCount(selectedSiteId || undefined, workOrders);
 
   const pieData = [
     { name: 'Open', value: woByStatus.open, color: statusColors.open },
@@ -204,7 +238,7 @@ export default function Dashboard() {
     .filter(pm => pm.status !== 'done')
     .filter(pm => new Date(pm.nextDueDate) <= addDays(new Date(), 7))
     .sort((a, b) => new Date(a.nextDueDate).getTime() - new Date(b.nextDueDate).getTime())
-    .slice(0, 5);
+    .slice(0, 8);
 
   const activeAlerts = alerts
     .filter(a => ['critical', 'warning'].includes(a.severity))
@@ -213,6 +247,45 @@ export default function Dashboard() {
   const filteredAssets = selectedSiteId
     ? assets.filter(a => a.siteId === selectedSiteId)
     : assets;
+
+  const healthBandData: {
+    label: string;
+    filter: 'critical' | 'at_risk' | 'healthy';
+    count: number;
+    color: string;
+  }[] = [
+    {
+      label: 'Critical',
+      filter: 'critical',
+      count: filteredAssets.filter((asset) => calculateAssetHealth(asset.id, workOrders, pmSchedules) < 40).length,
+      color: '#E53935',
+    },
+    {
+      label: 'At Risk',
+      filter: 'at_risk',
+      count: filteredAssets.filter((asset) => {
+        const score = calculateAssetHealth(asset.id, workOrders, pmSchedules);
+        return score >= 40 && score < 70;
+      }).length,
+      color: '#FB8C00',
+    },
+    {
+      label: 'Healthy',
+      filter: 'healthy',
+      count: filteredAssets.filter((asset) => calculateAssetHealth(asset.id, workOrders, pmSchedules) >= 70).length,
+      color: '#43A047',
+    },
+  ];
+
+  const criticalNotifications = notifications.filter(
+    (notification) => notification.severity === 'critical'
+  );
+
+  const handleGenerateWO = (pmSchedule: (typeof upcomingPMs)[number]) => {
+    const generatedWO = generateWOFromPMSchedule(pmSchedule);
+    const asset = getAssetById(pmSchedule.assetId);
+    setSnackbarMessage(`Work order ${generatedWO.number} created for ${asset?.name || pmSchedule.name}`);
+  };
 
   // Initialize map
   useEffect(() => {
@@ -265,6 +338,13 @@ export default function Dashboard() {
 
     // Add new markers
     filteredAssets.forEach(asset => {
+      const healthScore = calculateAssetHealth(asset.id, workOrders, pmSchedules);
+      const healthStatus = getHealthStatus(healthScore);
+      const openWorkOrderCount = workOrders.filter(
+        (workOrder) =>
+          workOrder.assetId === asset.id && !['resolved', 'closed'].includes(workOrder.status)
+      ).length;
+
       const markerEl = document.createElement('div');
       markerEl.className = 'asset-marker';
       markerEl.style.width = '24px';
@@ -273,16 +353,16 @@ export default function Dashboard() {
       markerEl.style.border = '3px solid white';
       markerEl.style.boxShadow = '0 2px 8px rgba(0,0,0,0.3)';
       markerEl.style.cursor = 'pointer';
-      markerEl.style.backgroundColor = healthColors[asset.healthStatus];
+      markerEl.style.backgroundColor = healthColors[healthStatus];
 
       const popup = new maplibregl.Popup({ offset: 25 }).setHTML(`
         <div style="font-family: Inter, sans-serif; padding: 4px;">
           <strong style="font-size: 14px;">${asset.name}</strong>
           <div style="font-size: 12px; color: #666; margin-top: 2px;">${asset.type}</div>
           <div style="font-size: 12px; margin-top: 4px;">
-            Health: <span style="color: ${healthColors[asset.healthStatus]}; font-weight: 600;">${asset.healthScore}%</span>
+            Health: <span style="color: ${healthColors[healthStatus]}; font-weight: 600;">${healthScore}%</span>
           </div>
-          ${asset.openWorkOrdersCount > 0 ? `<div style="font-size: 12px; color: #EF5350;">Open WOs: ${asset.openWorkOrdersCount}</div>` : ''}
+          ${openWorkOrderCount > 0 ? `<div style="font-size: 12px; color: #EF5350;">Open WOs: ${openWorkOrderCount}</div>` : ''}
         </div>
       `);
 
@@ -305,13 +385,26 @@ export default function Dashboard() {
         zoom: 16,
       });
     }
-  }, [filteredAssets, selectedSiteId]);
+  }, [filteredAssets, selectedSiteId, workOrders, pmSchedules]);
 
   return (
     <Box>
       <Typography variant="h4" sx={{ fontWeight: 700, mb: 2 }}>
         Dashboard
       </Typography>
+
+      {criticalNotifications.map((notification) => (
+        <Alert
+          key={notification.id}
+          severity="error"
+          sx={{ mb: 2 }}
+        >
+          <Typography variant="body2" sx={{ fontWeight: 700 }}>
+            {notification.title}
+          </Typography>
+          <Typography variant="caption">{notification.message}</Typography>
+        </Alert>
+      ))}
 
       {/* KPI Cards */}
       <Box sx={{ display: 'flex', gap: 2, mb: 3, flexWrap: 'nowrap' }}>
@@ -397,6 +490,42 @@ export default function Dashboard() {
           </Card>
         </Grid>
 
+        <Grid size={{ xs: 12, md: 6 }}>
+          <Card sx={{ height: 320 }}>
+            <CardContent sx={{ p: 2.5 }}>
+              <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
+                Asset Health Overview
+              </Typography>
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
+                Click a bar to filter assets by health band.
+              </Typography>
+              <Box sx={{ height: 220 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={healthBandData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />
+                    <XAxis dataKey="label" stroke={theme.palette.text.secondary} />
+                    <YAxis allowDecimals={false} stroke={theme.palette.text.secondary} />
+                    <Tooltip />
+                    <Bar
+                      dataKey="count"
+                      radius={[6, 6, 0, 0]}
+                      onClick={(payload: { filter?: 'critical' | 'at_risk' | 'healthy' }) => {
+                        if (payload?.filter) {
+                          setAssetHealthBandFilter(payload.filter);
+                        }
+                      }}
+                    >
+                      {healthBandData.map((entry) => (
+                        <Cell key={entry.label} fill={entry.color} cursor="pointer" />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+
         {/* Recent Work Orders */}
         <Grid size={{ xs: 12, md: 6 }}>
           <Card sx={{ height: 420 }}>
@@ -473,37 +602,56 @@ export default function Dashboard() {
           <Grid container spacing={3} sx={{ height: '100%' }}>
             {/* Upcoming PM */}
             <Grid size={{ xs: 12 }}>
-              <Card sx={{ height: 200 }}>
+              <Card sx={{ height: 240 }}>
                 <CardContent sx={{ p: 0, height: '100%', display: 'flex', flexDirection: 'column' }}>
-                  <Box sx={{ px: 2.5, py: 1.5, borderBottom: '1px solid', borderColor: 'divider' }}>
+                  <Box sx={{ px: 2.5, py: 1.5, borderBottom: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-                      Upcoming PM (7 days)
+                      {`Upcoming PM (7 days) — ${upcomingPMs.length} tasks`}
                     </Typography>
+                    <Chip size="small" color="primary" label={upcomingPMs.length} />
                   </Box>
                   <List dense sx={{ flex: 1, overflow: 'auto', py: 0 }}>
                     {upcomingPMs.map((pm) => {
                       const asset = getAssetById(pm.assetId);
-                      const isOverdue = pm.status === 'overdue';
+                      const site = getSiteById(pm.siteId);
+                      const urgency = getPMUrgency(pm.nextDueDate);
                       return (
-                        <ListItem key={pm.id} sx={{ py: 1 }}>
+                        <ListItem key={pm.id} sx={{ py: 1, gap: 1, alignItems: 'center' }}>
                           <ListItemText
                             primary={
-                              <Typography variant="body2" fontWeight={500}>
-                                {pm.name}
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                                <Typography variant="body2" fontWeight={600}>
+                                  {asset?.name}
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary">
+                                  {pm.name}
+                                </Typography>
+                              </Box>
+                            }
+                            secondary={
+                              <Typography variant="caption" color="text.secondary">
+                                {`${site?.name || ''} • Due ${format(new Date(pm.nextDueDate), 'MMM d, yyyy')}`}
                               </Typography>
                             }
-                            secondary={asset?.name}
                           />
                           <Chip
                             size="small"
-                            label={isOverdue ? 'Overdue' : formatDistanceToNow(new Date(pm.nextDueDate), { addSuffix: true })}
+                            label={urgency.label}
                             sx={{
-                              backgroundColor: isOverdue ? alpha('#EF5350', 0.1) : alpha('#FFA726', 0.1),
-                              color: isOverdue ? '#EF5350' : '#FFA726',
+                              backgroundColor: alpha(urgency.color, 0.12),
+                              color: urgency.color,
                               fontWeight: 500,
                               fontSize: '0.7rem',
                             }}
                           />
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            startIcon={<AddTaskIcon />}
+                            onClick={() => handleGenerateWO(pm)}
+                          >
+                            Generate WO
+                          </Button>
                         </ListItem>
                       );
                     })}
@@ -581,6 +729,17 @@ export default function Dashboard() {
           </Grid>
         </Grid>
       </Grid>
+
+      <Snackbar
+        open={Boolean(snackbarMessage)}
+        autoHideDuration={3000}
+        onClose={() => setSnackbarMessage('')}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert severity="success" variant="filled" onClose={() => setSnackbarMessage('')}>
+          {snackbarMessage}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }
