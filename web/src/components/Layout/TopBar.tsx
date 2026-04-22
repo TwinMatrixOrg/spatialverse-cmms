@@ -6,10 +6,12 @@ import {
   Button,
   Chip,
   Divider,
+  FormControl,
   IconButton,
   ListItemText,
   Menu,
   MenuItem,
+  Select,
   Toolbar,
   Tooltip,
   Typography,
@@ -24,6 +26,8 @@ import {
 } from '@mui/icons-material';
 import { useThemeContext } from '../../theme/ThemeContext';
 import { useAuth } from '../../auth/AuthContext';
+import { useStore } from '../../store/useStore';
+import { sites } from '../../data/mockData';
 
 interface TopBarProps {
   onMenuClick: () => void;
@@ -49,6 +53,7 @@ const getInitials = (name: string) =>
 export default function TopBar({ onMenuClick, isMobile }: TopBarProps) {
   const { mode, toggleTheme } = useThemeContext();
   const { role, roleLabel, roleOptions, setRole, logout } = useAuth();
+  const { selectedSiteId, setSelectedSiteId } = useStore();
 
   const [roleAnchor, setRoleAnchor] = useState<null | HTMLElement>(null);
   const [userAnchor, setUserAnchor] = useState<null | HTMLElement>(null);
@@ -106,12 +111,28 @@ export default function TopBar({ onMenuClick, isMobile }: TopBarProps) {
           </IconButton>
           {!isMobile && (
             <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-              SpatialVerse Pulse CMMS
+              The Pulse
             </Typography>
           )}
         </Box>
 
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }}>
+          {/* Site selector */}
+          {!isMobile && (
+            <FormControl size="small" sx={{ minWidth: 160 }}>
+              <Select
+                value={selectedSiteId ?? 'all'}
+                onChange={(e) => setSelectedSiteId(e.target.value === 'all' ? null : e.target.value)}
+                sx={{ fontSize: '0.8rem', height: 32, color: 'text.primary', '.MuiOutlinedInput-notchedOutline': { borderColor: 'divider' } }}
+              >
+                <MenuItem value="all">All Sites</MenuItem>
+                {sites.map((site) => (
+                  <MenuItem key={site.id} value={site.id}>{site.name}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          )}
+
           <Tooltip title={mode === 'dark' ? 'Light mode' : 'Dark mode'}>
             <IconButton onClick={toggleTheme} sx={{ color: 'text.primary' }}>
               {mode === 'dark' ? <LightModeIcon /> : <DarkModeIcon />}

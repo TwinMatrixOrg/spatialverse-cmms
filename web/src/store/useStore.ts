@@ -4,9 +4,25 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 import {
   Asset,
   AssetSensors,
+  DLPDefect,
+  DLPStatus,
+  DrawingDocument,
+  DrawingFormat,
+  drawingDocumentsSeed,
+  dlpDefectsSeed,
+  KpiMonthlyRecord,
+  kpiMonthlyRecordsSeed,
+  MeterReading,
+  meterReadingsSeed,
   SensorStatus,
   SensorType,
+  SpaceReservation,
+  SpaceReservationStatus,
+  spaceReservationsSeed,
   ThresholdRule,
+  UtilityBill,
+  UtilityType,
+  utilityBillsSeed,
   assets as seedAssets,
   getUserById,
   getAssetById,
@@ -83,6 +99,76 @@ interface CreatePermitInput {
   precautions?: string[];
 }
 
+interface CreateUtilityBillInput {
+  utilityType: UtilityType;
+  siteId: string;
+  billingPeriod: string;
+  amountRM: number;
+  units: number;
+  unitLabel: string;
+  remarks?: string;
+}
+
+interface AddMeterReadingInput {
+  utilityType: UtilityType;
+  siteId: string;
+  meterId: string;
+  readingDate: string;
+  previousReading: number;
+  currentReading: number;
+  unitLabel: string;
+}
+
+interface CreateDLPDefectInput {
+  siteId: string;
+  location: string;
+  description: string;
+  contractorId: string;
+  severity: DLPDefect['severity'];
+  targetRectificationDate: string;
+  dlpExpiryDate: string;
+}
+
+interface CreateDrawingDocumentInput {
+  siteId: string;
+  title: string;
+  location: string;
+  assetTag: string;
+  format: DrawingFormat;
+  discipline: string;
+  fileName: string;
+  uploadedBy: string;
+  note?: string;
+}
+
+interface AddDrawingVersionInput {
+  fileName: string;
+  uploadedBy: string;
+  note?: string;
+}
+
+interface CreateSpaceReservationInput {
+  siteId: string;
+  room: string;
+  startDateTime: string;
+  endDateTime: string;
+  requester: string;
+  event: string;
+  participants: number;
+  remarks?: string;
+}
+
+interface AddKpiMonthlyRecordInput {
+  month: string;
+  css: number;
+  customerRating: number;
+  responseTime: number;
+  pmCompliance: number;
+  woCompletion: number;
+  slaAdherence: number;
+  apdDeductionRM: number;
+}
+
 export type AssetHealthBand = 'all' | 'critical' | 'at_risk' | 'healthy';
 
 interface AppState {
@@ -119,6 +205,26 @@ interface AppState {
   createPermit: (input: CreatePermitInput) => Permit;
   updatePermitStatus: (permitId: string, status: PermitStatus) => void;
   togglePermitChecklistItem: (permitId: string, checklistItemId: string, completedById?: string) => void;
+  utilityBills: UtilityBill[];
+  meterReadings: MeterReading[];
+  addUtilityBill: (input: CreateUtilityBillInput) => void;
+  addMeterReading: (input: AddMeterReadingInput) => void;
+  dlpDefects: DLPDefect[];
+  nextDlpSequence: number;
+  createDLPDefect: (input: CreateDLPDefectInput) => void;
+  updateDLPDefectStatus: (defectId: string, status: DLPStatus) => void;
+  drawingDocuments: DrawingDocument[];
+  nextDrawingSequence: number;
+  addDrawingDocument: (input: CreateDrawingDocumentInput) => void;
+  addDrawingVersion: (documentId: string, input: AddDrawingVersionInput) => void;
+  spaceReservations: SpaceReservation[];
+  createSpaceReservation: (input: CreateSpaceReservationInput) => {
+    reservation: SpaceReservation | null;
+    conflict: SpaceReservation | null;
+  };
+  updateSpaceReservationStatus: (reservationId: string, status: SpaceReservationStatus) => void;
+  kpiMonthlyRecords: KpiMonthlyRecord[];
+  addKpiMonthlyRecord: (input: AddKpiMonthlyRecordInput) => void;
   saveRCA: (
     workOrderId: string,
     rootCause: RootCause,
@@ -415,6 +521,31 @@ const createDefaultPermitChecklist = (permitId: string): Permit['safetyChecklist
 const initialPermitSequence =
   seedPermits.reduce((highest, permit) => Math.max(highest, extractSequence(permit.permitNumber)), 0) + 1;
 
+const dlpStatusTransitions: Record<DLPStatus, DLPStatus[]> = {
+  open: ['in_progress'],
+  in_progress: ['verified'],
+  verified: ['accepted'],
+  accepted: [],
+};
+
+const reservationStatusTransitions: Record<SpaceReservationStatus, SpaceReservationStatus[]> = {
+  pending: ['approved', 'rejected'],
+  approved: ['rejected'],
+  rejected: ['pending'],
+};
+
+const siteCodeById: Record<string, string> = {
+  'site-1': 'PKL',
+  'site-2': 'SP',
+  'site-3': 'MV',
+};
+
+const initialDlpSequence =
+  dlpDefectsSeed.reduce((highest, defect) => Math.max(highest, extractSequence(defect.defectNo)), 0) + 1;
+
+const initialDrawingSequence =
+  drawingDocumentsSeed.reduce((highest, document) => Math.max(highest, extractSequence(document.documentNo)), 0) + 1;
+
 export const useStore = create<AppState>()(
   persist(
     (set, get) => ({
@@ -432,6 +563,14 @@ export const useStore = create<AppState>()(
       nextWorkOrderSequence: initialSequence,
       permits: seedPermits,
       nextPermitSequence: initialPermitSequence,
+      utilityBills: utilityBillsSeed,
+      meterReadings: meterReadingsSeed,
+      dlpDefects: dlpDefectsSeed,
+      nextDlpSequence: initialDlpSequence,
+      drawingDocuments: drawingDocumentsSeed,
+      nextDrawingSequence: initialDrawingSequence,
+      spaceReservations: spaceReservationsSeed,
+      kpiMonthlyRecords: kpiMonthlyRecordsSeed,
       pmSchedules: initialPMSchedules,
       notifications: initialNotifications,
       monitoredAssets: seedAssets.map((asset) => cloneAssetSensorData(asset)),
@@ -506,6 +645,270 @@ export const useStore = create<AppState>()(
       },
       assetHealthBandFilter: 'all',
       setAssetHealthBandFilter: (band) => set({ assetHealthBandFilter: band }),
+      addUtilityBill: (input) => {
+        if (input.amountRM <= 0 || input.units <= 0 || !input.billingPeriod.trim()) {
+          return;
+        }
+
+        const billingPeriod = input.billingPeriod.trim().slice(0, 7);
+        const timestamp = new Date().toISOString();
+
+        const nextBill: UtilityBill = {
+          id: `ub-${Date.now()}`,
+          utilityType: input.utilityType,
+          siteId: input.siteId,
+          billingPeriod,
+          amountRM: Number(input.amountRM.toFixed(2)),
+          units: Number(input.units.toFixed(2)),
+          unitLabel: input.unitLabel,
+          remarks: input.remarks?.trim() || undefined,
+          recordedAt: timestamp,
+        };
+
+        set((state) => ({
+          utilityBills: [nextBill, ...state.utilityBills],
+        }));
+      },
+      addMeterReading: (input) => {
+        if (
+          !input.meterId.trim()
+          || input.currentReading < input.previousReading
+          || input.currentReading < 0
+          || input.previousReading < 0
+        ) {
+          return;
+        }
+
+        const consumption = Number((input.currentReading - input.previousReading).toFixed(2));
+
+        const nextReading: MeterReading = {
+          id: `mr-${Date.now()}`,
+          utilityType: input.utilityType,
+          siteId: input.siteId,
+          meterId: input.meterId.trim(),
+          readingDate: input.readingDate,
+          previousReading: Number(input.previousReading.toFixed(2)),
+          currentReading: Number(input.currentReading.toFixed(2)),
+          consumption,
+          unitLabel: input.unitLabel,
+        };
+
+        set((state) => ({
+          meterReadings: [nextReading, ...state.meterReadings],
+        }));
+      },
+      createDLPDefect: (input) => {
+        if (!input.location.trim() || !input.description.trim()) {
+          return;
+        }
+
+        const nextSequence = get().nextDlpSequence;
+        const siteCode = siteCodeById[input.siteId] || 'SITE';
+        const nowIso = new Date().toISOString();
+
+        const defect: DLPDefect = {
+          id: `dlp-${Date.now()}`,
+          defectNo: `DLP-${siteCode}-${String(nextSequence).padStart(3, '0')}`,
+          siteId: input.siteId,
+          location: input.location.trim(),
+          description: input.description.trim(),
+          contractorId: input.contractorId,
+          severity: input.severity,
+          status: 'open',
+          reportedAt: nowIso,
+          targetRectificationDate: input.targetRectificationDate,
+          dlpExpiryDate: input.dlpExpiryDate,
+        };
+
+        set((state) => ({
+          dlpDefects: [defect, ...state.dlpDefects],
+          nextDlpSequence: state.nextDlpSequence + 1,
+        }));
+      },
+      updateDLPDefectStatus: (defectId, status) => {
+        const timestamp = new Date().toISOString();
+
+        set((state) => ({
+          dlpDefects: state.dlpDefects.map((defect) => {
+            if (defect.id !== defectId || defect.status === status) {
+              return defect;
+            }
+
+            const allowedStatuses = dlpStatusTransitions[defect.status] || [];
+            if (!allowedStatuses.includes(status)) {
+              return defect;
+            }
+
+            return {
+              ...defect,
+              status,
+              verifiedAt: status === 'verified' ? timestamp : defect.verifiedAt,
+              acceptedAt: status === 'accepted' ? timestamp : defect.acceptedAt,
+            };
+          }),
+        }));
+      },
+      addDrawingDocument: (input) => {
+        if (!input.title.trim() || !input.location.trim() || !input.fileName.trim()) {
+          return;
+        }
+
+        const nextSequence = get().nextDrawingSequence;
+        const siteCode = siteCodeById[input.siteId] || 'GEN';
+        const timestamp = new Date().toISOString();
+
+        const nextDocument: DrawingDocument = {
+          id: `drw-${Date.now()}`,
+          documentNo: `AWC-${siteCode}-DOC-${String(nextSequence).padStart(3, '0')}`,
+          title: input.title.trim(),
+          siteId: input.siteId,
+          location: input.location.trim(),
+          assetTag: input.assetTag.trim() || 'GENERAL',
+          format: input.format,
+          discipline: input.discipline.trim() || 'General',
+          currentVersion: 'v1.0',
+          uploadedBy: input.uploadedBy,
+          uploadedAt: timestamp,
+          versions: [
+            {
+              id: `drw-v-${Date.now()}`,
+              versionLabel: 'v1.0',
+              fileName: input.fileName.trim(),
+              uploadedBy: input.uploadedBy,
+              uploadedAt: timestamp,
+              note: input.note?.trim() || 'Initial upload',
+            },
+          ],
+        };
+
+        set((state) => ({
+          drawingDocuments: [nextDocument, ...state.drawingDocuments],
+          nextDrawingSequence: state.nextDrawingSequence + 1,
+        }));
+      },
+      addDrawingVersion: (documentId, input) => {
+        if (!input.fileName.trim()) {
+          return;
+        }
+
+        const timestamp = new Date().toISOString();
+
+        set((state) => ({
+          drawingDocuments: state.drawingDocuments.map((document) => {
+            if (document.id !== documentId) {
+              return document;
+            }
+
+            const nextMinorVersion = document.versions.length;
+            const versionLabel = `v1.${nextMinorVersion}`;
+
+            return {
+              ...document,
+              currentVersion: versionLabel,
+              uploadedAt: timestamp,
+              uploadedBy: input.uploadedBy,
+              versions: [
+                ...document.versions,
+                {
+                  id: `drv-${document.id}-${Date.now()}`,
+                  versionLabel,
+                  fileName: input.fileName.trim(),
+                  uploadedBy: input.uploadedBy,
+                  uploadedAt: timestamp,
+                  note: input.note?.trim(),
+                },
+              ],
+            };
+          }),
+        }));
+      },
+      createSpaceReservation: (input) => {
+        const startTime = new Date(input.startDateTime).getTime();
+        const endTime = new Date(input.endDateTime).getTime();
+
+        if (!Number.isFinite(startTime) || !Number.isFinite(endTime) || startTime >= endTime) {
+          return { reservation: null, conflict: null };
+        }
+
+        const conflict = get().spaceReservations.find((reservation) => {
+          if (
+            reservation.siteId !== input.siteId
+            || reservation.room.toLowerCase() !== input.room.trim().toLowerCase()
+            || reservation.status === 'rejected'
+          ) {
+            return false;
+          }
+
+          const existingStart = new Date(reservation.startDateTime).getTime();
+          const existingEnd = new Date(reservation.endDateTime).getTime();
+          return startTime < existingEnd && endTime > existingStart;
+        }) || null;
+
+        if (conflict) {
+          return { reservation: null, conflict };
+        }
+
+        const reservation: SpaceReservation = {
+          id: `res-${Date.now()}`,
+          siteId: input.siteId,
+          room: input.room.trim(),
+          startDateTime: input.startDateTime,
+          endDateTime: input.endDateTime,
+          requester: input.requester.trim(),
+          event: input.event.trim(),
+          participants: input.participants,
+          status: 'pending',
+          requestedAt: new Date().toISOString(),
+          remarks: input.remarks?.trim() || undefined,
+        };
+
+        set((state) => ({
+          spaceReservations: [reservation, ...state.spaceReservations],
+        }));
+
+        return { reservation, conflict: null };
+      },
+      updateSpaceReservationStatus: (reservationId, status) => {
+        set((state) => ({
+          spaceReservations: state.spaceReservations.map((reservation) => {
+            if (reservation.id !== reservationId || reservation.status === status) {
+              return reservation;
+            }
+
+            const allowedStatuses = reservationStatusTransitions[reservation.status] || [];
+            if (!allowedStatuses.includes(status)) {
+              return reservation;
+            }
+
+            return {
+              ...reservation,
+              status,
+            };
+          }),
+        }));
+      },
+      addKpiMonthlyRecord: (input) => {
+        const normalizePercentage = (value: number) => Math.max(0, Math.min(100, Number(value.toFixed(1))));
+
+        const nextRecord: KpiMonthlyRecord = {
+          id: `kpi-${input.month}`,
+          month: input.month,
+          css: normalizePercentage(input.css),
+          customerRating: normalizePercentage(input.customerRating),
+          responseTime: normalizePercentage(input.responseTime),
+          pmCompliance: normalizePercentage(input.pmCompliance),
+          woCompletion: normalizePercentage(input.woCompletion),
+          slaAdherence: normalizePercentage(input.slaAdherence),
+          apdDeductionRM: Math.max(0, Number(input.apdDeductionRM.toFixed(2))),
+        };
+
+        set((state) => {
+          const filteredRecords = state.kpiMonthlyRecords.filter((record) => record.month !== input.month);
+          return {
+            kpiMonthlyRecords: [nextRecord, ...filteredRecords].sort((a, b) => b.month.localeCompare(a.month)),
+          };
+        });
+      },
       createWorkOrder: (input) => {
         const createdAt = new Date().toISOString();
         const asset = getAssetById(input.assetId);
@@ -1105,6 +1508,14 @@ export const useStore = create<AppState>()(
         nextWorkOrderSequence: state.nextWorkOrderSequence,
         permits: state.permits,
         nextPermitSequence: state.nextPermitSequence,
+        utilityBills: state.utilityBills,
+        meterReadings: state.meterReadings,
+        dlpDefects: state.dlpDefects,
+        nextDlpSequence: state.nextDlpSequence,
+        drawingDocuments: state.drawingDocuments,
+        nextDrawingSequence: state.nextDrawingSequence,
+        spaceReservations: state.spaceReservations,
+        kpiMonthlyRecords: state.kpiMonthlyRecords,
         monitoredAssets: state.monitoredAssets,
         thresholdRules: state.thresholdRules,
         acknowledgedAlerts: state.acknowledgedAlerts,

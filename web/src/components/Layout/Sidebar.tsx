@@ -1,6 +1,7 @@
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Box,
+  Collapse,
   Drawer,
   SwipeableDrawer,
   List,
@@ -19,7 +20,6 @@ import {
   Assignment as WorkOrderIcon,
   AssignmentLate as PermitIcon,
   Inventory2 as AssetIcon,
-  Apartment as SpaceConsoleIcon,
   EventNote as PMIcon,
   Engineering as ContractorIcon,
   Warehouse as InventoryIcon,
@@ -27,8 +27,17 @@ import {
   Settings as SettingsIcon,
   MonitorHeart as MonitorHeartIcon,
   Map as MapIcon,
+  Science as FailureAnalysisIcon,
+  Opacity as UtilityIcon,
+  FactCheck as DlpIcon,
+  Description as DrawingIcon,
+  EventAvailable as ReservationIcon,
+  Speed as KpiIcon,
+  ExpandMore,
+  ChevronRight,
 } from '@mui/icons-material';
 import { useAuth, type UserRole } from '../../auth/AuthContext';
+import { useState } from 'react';
 
 interface SidebarProps {
   open: boolean;
@@ -43,24 +52,101 @@ interface MenuItemConfig {
   icon: ReactNode;
   path: string;
   roles: UserRole[];
+  hideIfRouteMissing?: boolean;
 }
 
-const menuItems: MenuItemConfig[] = [
-  { text: 'Dashboard', icon: <DashboardIcon />, path: '/', roles: ['fm_manager', 'supervisor', 'technician', 'space_manager'] },
-  { text: 'Work Orders', icon: <WorkOrderIcon />, path: '/work-orders', roles: ['fm_manager', 'supervisor', 'technician'] },
-  { text: 'Permits', icon: <PermitIcon />, path: '/permits', roles: ['fm_manager', 'supervisor'] },
-  { text: 'Assets', icon: <AssetIcon />, path: '/assets', roles: ['fm_manager', 'supervisor', 'technician', 'space_manager'] },
-  { text: 'Condition Monitoring', icon: <MonitorHeartIcon />, path: '/condition-monitoring', roles: ['fm_manager', 'supervisor'] },
-  { text: 'Floor Plan', icon: <MapIcon />, path: '/floor-plan', roles: ['fm_manager', 'supervisor', 'technician', 'space_manager'] },
-  { text: 'PM Schedules', icon: <PMIcon />, path: '/pm-schedules', roles: ['fm_manager', 'supervisor'] },
-  { text: 'Contractors', icon: <ContractorIcon />, path: '/contractors', roles: ['fm_manager'] },
-  { text: 'Inventory', icon: <InventoryIcon />, path: '/inventory', roles: ['fm_manager'] },
-  { text: 'Reports', icon: <ReportIcon />, path: '/reports', roles: ['fm_manager', 'supervisor'] },
-  { text: 'Space Console', icon: <SpaceConsoleIcon />, path: '/space-console', roles: ['fm_manager', 'space_manager'] },
-];
+interface MenuSectionConfig {
+  id: string;
+  label: string;
+  items: MenuItemConfig[];
+}
 
-const bottomMenuItems: MenuItemConfig[] = [
-  { text: 'Settings', icon: <SettingsIcon />, path: '/settings', roles: ['fm_manager'] },
+const existingRoutePaths = new Set([
+  '/',
+  '/work-orders',
+  '/permits',
+  '/assets',
+  '/condition-monitoring',
+  '/floor-plan',
+  '/utility-management',
+  '/dlp-tracker',
+  '/drawing-management',
+  '/space-reservations',
+  '/kpi-dashboard',
+  '/pm-schedules',
+  '/contractors',
+  '/inventory',
+  '/reports',
+  '/settings',
+  '/space-console',
+]);
+
+const menuSections: MenuSectionConfig[] = [
+  {
+    id: 'overview',
+    label: '🏠 Overview',
+    items: [
+      { text: 'Dashboard', icon: <DashboardIcon />, path: '/', roles: ['fm_manager', 'supervisor', 'technician', 'space_manager'] },
+    ],
+  },
+  {
+    id: 'operations',
+    label: '🔧 Operations',
+    items: [
+      { text: 'Work Orders', icon: <WorkOrderIcon />, path: '/work-orders', roles: ['fm_manager', 'supervisor', 'technician'] },
+      {
+        text: 'Permits to Work',
+        icon: <PermitIcon />,
+        path: '/permits',
+        roles: ['fm_manager', 'supervisor'],
+        hideIfRouteMissing: true,
+      },
+      {
+        text: 'Failure Analysis / RCA',
+        icon: <FailureAnalysisIcon />,
+        path: '/failure-analysis',
+        roles: ['fm_manager', 'supervisor'],
+        hideIfRouteMissing: true,
+      },
+    ],
+  },
+  {
+    id: 'assets',
+    label: '🏗️ Assets',
+    items: [
+      { text: 'Asset Registry', icon: <AssetIcon />, path: '/assets', roles: ['fm_manager', 'supervisor', 'technician', 'space_manager'] },
+      { text: 'Condition Monitoring', icon: <MonitorHeartIcon />, path: '/condition-monitoring', roles: ['fm_manager', 'supervisor'] },
+      { text: 'Drawing Management', icon: <DrawingIcon />, path: '/drawing-management', roles: ['fm_manager', 'supervisor', 'technician', 'space_manager'] },
+      { text: 'Floor Plan', icon: <MapIcon />, path: '/floor-plan', roles: ['fm_manager', 'supervisor', 'technician', 'space_manager'] },
+    ],
+  },
+  {
+    id: 'planning',
+    label: '📅 Planning',
+    items: [
+      { text: 'PM Schedules', icon: <PMIcon />, path: '/pm-schedules', roles: ['fm_manager', 'supervisor'] },
+      { text: 'Utility Management', icon: <UtilityIcon />, path: '/utility-management', roles: ['fm_manager', 'supervisor'] },
+      { text: 'DLP Tracker', icon: <DlpIcon />, path: '/dlp-tracker', roles: ['fm_manager', 'supervisor'] },
+      { text: 'Inventory', icon: <InventoryIcon />, path: '/inventory', roles: ['fm_manager'] },
+    ],
+  },
+  {
+    id: 'people',
+    label: '👥 People',
+    items: [
+      { text: 'Contractors', icon: <ContractorIcon />, path: '/contractors', roles: ['fm_manager'] },
+      { text: 'Space Reservations', icon: <ReservationIcon />, path: '/space-reservations', roles: ['fm_manager', 'supervisor', 'space_manager'] },
+    ],
+  },
+  {
+    id: 'insights',
+    label: '📊 Insights',
+    items: [
+      { text: 'Reports', icon: <ReportIcon />, path: '/reports', roles: ['fm_manager', 'supervisor'] },
+      { text: 'KPI Dashboard', icon: <KpiIcon />, path: '/kpi-dashboard', roles: ['fm_manager', 'supervisor'] },
+      { text: 'Settings', icon: <SettingsIcon />, path: '/settings', roles: ['fm_manager'] },
+    ],
+  },
 ];
 
 export default function Sidebar({ open, onClose, drawerWidth, collapsedWidth, isMobile }: SidebarProps) {
@@ -68,6 +154,9 @@ export default function Sidebar({ open, onClose, drawerWidth, collapsedWidth, is
   const location = useLocation();
   const navigate = useNavigate();
   const { role } = useAuth();
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>(() => (
+    Object.fromEntries(menuSections.map((section) => [section.id, true]))
+  ));
 
   const handleNavigation = (path: string) => {
     navigate(path);
@@ -84,8 +173,87 @@ export default function Sidebar({ open, onClose, drawerWidth, collapsedWidth, is
   };
 
   const currentWidth = isMobile ? drawerWidth : (open ? drawerWidth : collapsedWidth);
-  const visibleMenuItems = menuItems.filter((item) => item.roles.includes(role));
-  const visibleBottomMenuItems = bottomMenuItems.filter((item) => item.roles.includes(role));
+  const showSectionLayout = open || isMobile;
+
+  const visibleSections = menuSections
+    .map((section) => ({
+      ...section,
+      items: section.items.filter((item) => (
+        item.roles.includes(role)
+        && (!item.hideIfRouteMissing || existingRoutePaths.has(item.path))
+      )),
+    }))
+    .filter((section) => section.items.length > 0);
+
+  const visibleFlatMenuItems = visibleSections.flatMap((section) => section.items);
+
+  const toggleSection = (sectionId: string) => {
+    setExpandedSections((prev) => ({
+      ...prev,
+      [sectionId]: !prev[sectionId],
+    }));
+  };
+
+  const getMenuItemSx = (active: boolean, nested: boolean) => ({
+    borderRadius: 1.5,
+    minHeight: 38,
+    justifyContent: showSectionLayout ? 'initial' : 'center',
+    pl: showSectionLayout ? (nested ? 2.25 : 1.5) : 0,
+    pr: showSectionLayout ? 1.25 : 0,
+    py: 0.25,
+    backgroundColor: active
+      ? theme.palette.mode === 'dark'
+        ? 'rgba(0, 188, 212, 0.15)'
+        : 'rgba(0, 188, 212, 0.1)'
+      : 'transparent',
+    borderLeft: active ? `3px solid ${theme.palette.primary.main}` : '3px solid transparent',
+    '&:hover': {
+      backgroundColor: theme.palette.mode === 'dark'
+        ? 'rgba(255, 255, 255, 0.05)'
+        : 'rgba(0, 0, 0, 0.04)',
+    },
+  });
+
+  const renderMenuItem = (item: MenuItemConfig, nested = false) => {
+    const active = isActive(item.path);
+
+    return (
+      <Tooltip
+        key={item.path}
+        title={!showSectionLayout ? item.text : ''}
+        placement="right"
+        arrow
+      >
+        <ListItem disablePadding sx={{ mb: 0.25 }}>
+          <ListItemButton
+            onClick={() => handleNavigation(item.path)}
+            sx={getMenuItemSx(active, nested)}
+          >
+            <ListItemIcon
+              sx={{
+                minWidth: 0,
+                mr: showSectionLayout ? 1.5 : 0,
+                justifyContent: 'center',
+                color: active ? 'primary.main' : 'text.secondary',
+              }}
+            >
+              {item.icon}
+            </ListItemIcon>
+            {showSectionLayout && (
+              <ListItemText
+                primary={item.text}
+                primaryTypographyProps={{
+                  fontSize: '0.82rem',
+                  fontWeight: active ? 600 : 500,
+                  color: active ? 'primary.main' : 'text.primary',
+                }}
+              />
+            )}
+          </ListItemButton>
+        </ListItem>
+      </Tooltip>
+    );
+  };
 
   const drawerContent = (
     <Box
@@ -160,127 +328,54 @@ export default function Sidebar({ open, onClose, drawerWidth, collapsedWidth, is
       <Divider />
 
       {/* Main Navigation */}
-      <List sx={{ flexGrow: 1, px: 1, py: 2 }}>
-        {visibleMenuItems.map((item) => {
-          const active = isActive(item.path);
-          return (
-            <Tooltip
-              key={item.path}
-              title={!open && !isMobile ? item.text : ''}
-              placement="right"
-              arrow
-            >
-              <ListItem disablePadding sx={{ mb: 0.5 }}>
+      <List sx={{ flexGrow: 1, px: 1, py: 1.25 }}>
+        {showSectionLayout ? (
+          visibleSections.map((section) => (
+            <Box key={section.id} sx={{ mb: 0.75 }}>
+              <ListItem disablePadding>
                 <ListItemButton
-                  onClick={() => handleNavigation(item.path)}
+                  onClick={() => toggleSection(section.id)}
                   sx={{
-                    borderRadius: 2,
-                    minHeight: 44,
-                    justifyContent: open || isMobile ? 'initial' : 'center',
-                    px: 2,
-                    backgroundColor: active
-                      ? theme.palette.mode === 'dark'
-                        ? 'rgba(0, 188, 212, 0.15)'
-                        : 'rgba(0, 188, 212, 0.1)'
-                      : 'transparent',
-                    borderLeft: active ? `3px solid ${theme.palette.primary.main}` : '3px solid transparent',
+                    minHeight: 28,
+                    borderRadius: 1.5,
+                    px: 1,
+                    py: 0,
+                    mb: 0.25,
                     '&:hover': {
                       backgroundColor: theme.palette.mode === 'dark'
-                        ? 'rgba(255, 255, 255, 0.05)'
-                        : 'rgba(0, 0, 0, 0.04)',
+                        ? 'rgba(255, 255, 255, 0.03)'
+                        : 'rgba(0, 0, 0, 0.02)',
                     },
                   }}
                 >
-                  <ListItemIcon
-                    sx={{
-                      minWidth: 0,
-                      mr: open || isMobile ? 2 : 0,
-                      justifyContent: 'center',
-                      color: active ? 'primary.main' : 'text.secondary',
+                  <ListItemText
+                    primary={section.label}
+                    primaryTypographyProps={{
+                      fontSize: '0.7rem',
+                      fontWeight: 700,
+                      letterSpacing: '0.01em',
+                      color: 'text.secondary',
                     }}
-                  >
-                    {item.icon}
-                  </ListItemIcon>
-                  {(open || isMobile) && (
-                    <ListItemText
-                      primary={item.text}
-                      primaryTypographyProps={{
-                        fontSize: '0.875rem',
-                        fontWeight: active ? 600 : 400,
-                        color: active ? 'primary.main' : 'text.primary',
-                      }}
-                    />
+                  />
+                  {expandedSections[section.id] ? (
+                    <ExpandMore sx={{ fontSize: '1.05rem', color: 'text.secondary' }} />
+                  ) : (
+                    <ChevronRight sx={{ fontSize: '1.05rem', color: 'text.secondary' }} />
                   )}
                 </ListItemButton>
               </ListItem>
-            </Tooltip>
-          );
-        })}
+
+              <Collapse in={expandedSections[section.id]} timeout="auto" unmountOnExit>
+                <List disablePadding>
+                  {section.items.map((item) => renderMenuItem(item, true))}
+                </List>
+              </Collapse>
+            </Box>
+          ))
+        ) : (
+          visibleFlatMenuItems.map((item) => renderMenuItem(item))
+        )}
       </List>
-
-      {visibleBottomMenuItems.length > 0 && (
-        <>
-          <Divider />
-
-          {/* Bottom Navigation */}
-          <List sx={{ px: 1, py: 2 }}>
-            {visibleBottomMenuItems.map((item) => {
-              const active = isActive(item.path);
-              return (
-                <Tooltip
-                  key={item.path}
-                  title={!open && !isMobile ? item.text : ''}
-                  placement="right"
-                  arrow
-                >
-                  <ListItem disablePadding>
-                    <ListItemButton
-                      onClick={() => handleNavigation(item.path)}
-                      sx={{
-                        borderRadius: 2,
-                        minHeight: 44,
-                        justifyContent: open || isMobile ? 'initial' : 'center',
-                        px: 2,
-                        backgroundColor: active
-                          ? theme.palette.mode === 'dark'
-                            ? 'rgba(0, 188, 212, 0.15)'
-                            : 'rgba(0, 188, 212, 0.1)'
-                          : 'transparent',
-                        '&:hover': {
-                          backgroundColor: theme.palette.mode === 'dark'
-                            ? 'rgba(255, 255, 255, 0.05)'
-                            : 'rgba(0, 0, 0, 0.04)',
-                        },
-                      }}
-                    >
-                      <ListItemIcon
-                        sx={{
-                          minWidth: 0,
-                          mr: open || isMobile ? 2 : 0,
-                          justifyContent: 'center',
-                          color: active ? 'primary.main' : 'text.secondary',
-                        }}
-                      >
-                        {item.icon}
-                      </ListItemIcon>
-                      {(open || isMobile) && (
-                        <ListItemText
-                          primary={item.text}
-                          primaryTypographyProps={{
-                            fontSize: '0.875rem',
-                            fontWeight: active ? 600 : 400,
-                            color: active ? 'primary.main' : 'text.primary',
-                          }}
-                        />
-                      )}
-                    </ListItemButton>
-                  </ListItem>
-                </Tooltip>
-              );
-            })}
-          </List>
-        </>
-      )}
 
       {/* TMT Branding */}
       {(open || isMobile) && (

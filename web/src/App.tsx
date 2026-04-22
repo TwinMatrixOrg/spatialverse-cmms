@@ -14,6 +14,11 @@ import Login from './pages/Login';
 import SpaceConsole from './pages/SpaceConsole';
 import ConditionMonitoring from './pages/ConditionMonitoring';
 import FloorPlan from './pages/FloorPlan';
+import UtilityManagement from './pages/UtilityManagement';
+import DLPTracker from './pages/DLPTracker';
+import DrawingManagement from './pages/DrawingManagement';
+import SpaceReservation from './pages/SpaceReservation';
+import KPIDashboard from './pages/KPIDashboard';
 
 function App() {
   const { loggedIn } = useAuth();
@@ -35,6 +40,11 @@ function App() {
         <Route path="space-console" element={<SpaceConsole />} />
         <Route path="condition-monitoring" element={<ConditionMonitoring />} />
         <Route path="floor-plan" element={<FloorPlan />} />
+        <Route path="utility-management" element={<UtilityManagement />} />
+        <Route path="dlp-tracker" element={<DLPTracker />} />
+        <Route path="drawing-management" element={<DrawingManagement />} />
+        <Route path="space-reservations" element={<SpaceReservation />} />
+        <Route path="kpi-dashboard" element={<KPIDashboard />} />
         <Route path="*" element={<Navigate to={loggedIn ? '/' : '/login'} replace />} />
       </Route>
 

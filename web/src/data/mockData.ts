@@ -298,6 +298,105 @@ export interface Permit {
   safetyChecklist: PermitSafetyChecklistItem[];
 }
 
+export type UtilityType = 'Electricity' | 'Water' | 'Gas' | 'Chilled Water' | 'Sewerage';
+
+export interface UtilityBill {
+  id: string;
+  utilityType: UtilityType;
+  siteId: string;
+  billingPeriod: string;
+  amountRM: number;
+  units: number;
+  unitLabel: string;
+  remarks?: string;
+  recordedAt: string;
+}
+
+export interface MeterReading {
+  id: string;
+  utilityType: UtilityType;
+  siteId: string;
+  meterId: string;
+  readingDate: string;
+  previousReading: number;
+  currentReading: number;
+  consumption: number;
+  unitLabel: string;
+}
+
+export type DLPSeverity = 'Low' | 'Medium' | 'High' | 'Critical';
+export type DLPStatus = 'open' | 'in_progress' | 'verified' | 'accepted';
+
+export interface DLPDefect {
+  id: string;
+  defectNo: string;
+  siteId: string;
+  location: string;
+  description: string;
+  contractorId: string;
+  severity: DLPSeverity;
+  status: DLPStatus;
+  reportedAt: string;
+  targetRectificationDate: string;
+  verifiedAt?: string;
+  acceptedAt?: string;
+  dlpExpiryDate: string;
+}
+
+export type DrawingFormat = 'CAD' | 'JPEG' | 'PDF';
+
+export interface DrawingVersion {
+  id: string;
+  versionLabel: string;
+  fileName: string;
+  uploadedBy: string;
+  uploadedAt: string;
+  note?: string;
+}
+
+export interface DrawingDocument {
+  id: string;
+  documentNo: string;
+  title: string;
+  siteId: string;
+  location: string;
+  assetTag: string;
+  format: DrawingFormat;
+  discipline: string;
+  currentVersion: string;
+  uploadedBy: string;
+  uploadedAt: string;
+  versions: DrawingVersion[];
+}
+
+export type SpaceReservationStatus = 'pending' | 'approved' | 'rejected';
+
+export interface SpaceReservation {
+  id: string;
+  siteId: string;
+  room: string;
+  startDateTime: string;
+  endDateTime: string;
+  requester: string;
+  event: string;
+  participants: number;
+  status: SpaceReservationStatus;
+  requestedAt: string;
+  remarks?: string;
+}
+
+export interface KpiMonthlyRecord {
+  id: string;
+  month: string;
+  css: number;
+  customerRating: number;
+  responseTime: number;
+  pmCompliance: number;
+  woCompletion: number;
+  slaAdherence: number;
+  apdDeductionRM: number;
+}
+
 // Sites - Malaysian Malls
 export const sites: Site[] = [
   {
@@ -1817,6 +1916,141 @@ export const permits: Permit[] = [
   },
 ];
 
+export const utilityTypeLabels: Record<UtilityType, string> = {
+  Electricity: 'Electricity',
+  Water: 'Water',
+  Gas: 'Gas',
+  'Chilled Water': 'Chilled Water',
+  Sewerage: 'Sewerage',
+};
+
+export const dlpStatusLabels: Record<DLPStatus, string> = {
+  open: 'Open',
+  in_progress: 'In Progress',
+  verified: 'Verified',
+  accepted: 'Accepted',
+};
+
+export const reservationStatusLabels: Record<SpaceReservationStatus, string> = {
+  pending: 'Pending',
+  approved: 'Approved',
+  rejected: 'Rejected',
+};
+
+export const utilityBillsSeed: UtilityBill[] = [
+  { id: 'ub-1', utilityType: 'Electricity', siteId: 'site-1', billingPeriod: '2025-11', amountRM: 148200, units: 312500, unitLabel: 'kWh', recordedAt: subDays(165) },
+  { id: 'ub-2', utilityType: 'Water', siteId: 'site-1', billingPeriod: '2025-11', amountRM: 42100, units: 24900, unitLabel: 'm³', recordedAt: subDays(165), remarks: 'Cooling tower usage higher than baseline' },
+  { id: 'ub-3', utilityType: 'Electricity', siteId: 'site-2', billingPeriod: '2025-12', amountRM: 136400, units: 281400, unitLabel: 'kWh', recordedAt: subDays(135) },
+  { id: 'ub-4', utilityType: 'Water', siteId: 'site-2', billingPeriod: '2025-12', amountRM: 36900, units: 21400, unitLabel: 'm³', recordedAt: subDays(135) },
+  { id: 'ub-5', utilityType: 'Electricity', siteId: 'site-3', billingPeriod: '2026-01', amountRM: 139900, units: 286800, unitLabel: 'kWh', recordedAt: subDays(105) },
+  { id: 'ub-6', utilityType: 'Gas', siteId: 'site-3', billingPeriod: '2026-01', amountRM: 22400, units: 7150, unitLabel: 'MMBtu', recordedAt: subDays(105) },
+  { id: 'ub-7', utilityType: 'Electricity', siteId: 'site-1', billingPeriod: '2026-02', amountRM: 151800, units: 318100, unitLabel: 'kWh', recordedAt: subDays(75) },
+  { id: 'ub-8', utilityType: 'Water', siteId: 'site-1', billingPeriod: '2026-02', amountRM: 43500, units: 25950, unitLabel: 'm³', recordedAt: subDays(75) },
+  { id: 'ub-9', utilityType: 'Chilled Water', siteId: 'site-2', billingPeriod: '2026-03', amountRM: 49800, units: 18400, unitLabel: 'RT-hr', recordedAt: subDays(45) },
+  { id: 'ub-10', utilityType: 'Electricity', siteId: 'site-2', billingPeriod: '2026-03', amountRM: 141600, units: 293100, unitLabel: 'kWh', recordedAt: subDays(45) },
+  { id: 'ub-11', utilityType: 'Electricity', siteId: 'site-3', billingPeriod: '2026-04', amountRM: 146300, units: 302700, unitLabel: 'kWh', recordedAt: subDays(15) },
+  { id: 'ub-12', utilityType: 'Sewerage', siteId: 'site-3', billingPeriod: '2026-04', amountRM: 9100, units: 12000, unitLabel: 'm³', recordedAt: subDays(15) },
+];
+
+export const meterReadingsSeed: MeterReading[] = [
+  { id: 'mr-1', utilityType: 'Electricity', siteId: 'site-1', meterId: 'EM-PKL-01', readingDate: subDays(180), previousReading: 1342000, currentReading: 1371100, consumption: 29100, unitLabel: 'kWh' },
+  { id: 'mr-2', utilityType: 'Water', siteId: 'site-1', meterId: 'WM-PKL-02', readingDate: subDays(165), previousReading: 484900, currentReading: 487240, consumption: 2340, unitLabel: 'm³' },
+  { id: 'mr-3', utilityType: 'Electricity', siteId: 'site-2', meterId: 'EM-SP-01', readingDate: subDays(150), previousReading: 1118400, currentReading: 1147200, consumption: 28800, unitLabel: 'kWh' },
+  { id: 'mr-4', utilityType: 'Water', siteId: 'site-2', meterId: 'WM-SP-01', readingDate: subDays(135), previousReading: 402220, currentReading: 404180, consumption: 1960, unitLabel: 'm³' },
+  { id: 'mr-5', utilityType: 'Electricity', siteId: 'site-3', meterId: 'EM-MV-01', readingDate: subDays(120), previousReading: 1215400, currentReading: 1244800, consumption: 29400, unitLabel: 'kWh' },
+  { id: 'mr-6', utilityType: 'Gas', siteId: 'site-3', meterId: 'GM-MV-01', readingDate: subDays(105), previousReading: 93600, currentReading: 94320, consumption: 720, unitLabel: 'MMBtu' },
+  { id: 'mr-7', utilityType: 'Electricity', siteId: 'site-1', meterId: 'EM-PKL-01', readingDate: subDays(90), previousReading: 1371100, currentReading: 1402200, consumption: 31100, unitLabel: 'kWh' },
+  { id: 'mr-8', utilityType: 'Water', siteId: 'site-1', meterId: 'WM-PKL-02', readingDate: subDays(75), previousReading: 487240, currentReading: 489610, consumption: 2370, unitLabel: 'm³' },
+  { id: 'mr-9', utilityType: 'Chilled Water', siteId: 'site-2', meterId: 'CWM-SP-03', readingDate: subDays(60), previousReading: 221100, currentReading: 223020, consumption: 1920, unitLabel: 'RT-hr' },
+  { id: 'mr-10', utilityType: 'Electricity', siteId: 'site-2', meterId: 'EM-SP-01', readingDate: subDays(45), previousReading: 1147200, currentReading: 1176400, consumption: 29200, unitLabel: 'kWh' },
+  { id: 'mr-11', utilityType: 'Electricity', siteId: 'site-3', meterId: 'EM-MV-01', readingDate: subDays(30), previousReading: 1244800, currentReading: 1275000, consumption: 30200, unitLabel: 'kWh' },
+  { id: 'mr-12', utilityType: 'Sewerage', siteId: 'site-3', meterId: 'SW-MV-01', readingDate: subDays(15), previousReading: 172900, currentReading: 173940, consumption: 1040, unitLabel: 'm³' },
+];
+
+export const dlpDefectsSeed: DLPDefect[] = [
+  { id: 'dlp-1', defectNo: 'DLP-PKL-001', siteId: 'site-1', location: 'L2 Retail Corridor', description: 'Ceiling water stain recurring near AHU duct chase.', contractorId: 'contractor-2', severity: 'High', status: 'open', reportedAt: subDays(32), targetRectificationDate: addDays(5), dlpExpiryDate: addDays(90) },
+  { id: 'dlp-2', defectNo: 'DLP-PKL-002', siteId: 'site-1', location: 'B2 Loading Bay', description: 'Expansion joint sealant cracked along 6m stretch.', contractorId: 'contractor-1', severity: 'Medium', status: 'in_progress', reportedAt: subDays(41), targetRectificationDate: addDays(2), dlpExpiryDate: addDays(76) },
+  { id: 'dlp-3', defectNo: 'DLP-PKL-003', siteId: 'site-1', location: 'L4 Family Washroom', description: 'Wall tile hollow sound and grout separation.', contractorId: 'contractor-8', severity: 'Low', status: 'verified', reportedAt: subDays(54), targetRectificationDate: subDays(5), verifiedAt: subDays(3), dlpExpiryDate: addDays(82) },
+  { id: 'dlp-4', defectNo: 'DLP-SP-004', siteId: 'site-2', location: 'Main Atrium Skylight Zone', description: 'Condensation drip at mullion joint during rain.', contractorId: 'contractor-4', severity: 'Critical', status: 'in_progress', reportedAt: subDays(20), targetRectificationDate: addDays(1), dlpExpiryDate: addDays(61) },
+  { id: 'dlp-5', defectNo: 'DLP-SP-005', siteId: 'site-2', location: 'L1 North Entrance', description: 'Stone cladding corner chipped and requires replacement.', contractorId: 'contractor-1', severity: 'Medium', status: 'accepted', reportedAt: subDays(90), targetRectificationDate: subDays(48), verifiedAt: subDays(40), acceptedAt: subDays(35), dlpExpiryDate: addDays(45) },
+  { id: 'dlp-6', defectNo: 'DLP-SP-006', siteId: 'site-2', location: 'B3 Pump Room', description: 'Pipe support bracket misalignment causing vibration.', contractorId: 'contractor-6', severity: 'High', status: 'open', reportedAt: subDays(12), targetRectificationDate: addDays(6), dlpExpiryDate: addDays(40) },
+  { id: 'dlp-7', defectNo: 'DLP-MV-007', siteId: 'site-3', location: 'L3 Cinema Lobby', description: 'Gypsum partition hairline crack at door frame.', contractorId: 'contractor-8', severity: 'Low', status: 'accepted', reportedAt: subDays(88), targetRectificationDate: subDays(60), verifiedAt: subDays(56), acceptedAt: subDays(50), dlpExpiryDate: addDays(33) },
+  { id: 'dlp-8', defectNo: 'DLP-MV-008', siteId: 'site-3', location: 'B2 Generator Room', description: 'Acoustic panel detachment at corner fixing points.', contractorId: 'contractor-3', severity: 'High', status: 'verified', reportedAt: subDays(38), targetRectificationDate: subDays(4), verifiedAt: subDays(1), dlpExpiryDate: addDays(54) },
+  { id: 'dlp-9', defectNo: 'DLP-MV-009', siteId: 'site-3', location: 'L1 South Lift Lobby', description: 'Lift lobby floor tile level mismatch causing trip edge.', contractorId: 'contractor-5', severity: 'Critical', status: 'in_progress', reportedAt: subDays(15), targetRectificationDate: addDays(4), dlpExpiryDate: addDays(29) },
+  { id: 'dlp-10', defectNo: 'DLP-PKL-010', siteId: 'site-1', location: 'Roof Mechanical Deck', description: 'Rainwater downpipe bracket corrosion on fresh install.', contractorId: 'contractor-6', severity: 'Medium', status: 'open', reportedAt: subDays(8), targetRectificationDate: addDays(8), dlpExpiryDate: addDays(23) },
+  { id: 'dlp-11', defectNo: 'DLP-SP-011', siteId: 'site-2', location: 'L2 Fire Escape Stair C', description: 'Emergency lighting lux level below commissioning baseline.', contractorId: 'contractor-3', severity: 'High', status: 'verified', reportedAt: subDays(47), targetRectificationDate: subDays(10), verifiedAt: subDays(7), dlpExpiryDate: addDays(18) },
+  { id: 'dlp-12', defectNo: 'DLP-MV-012', siteId: 'site-3', location: 'B1 Service Corridor', description: 'Door closer installation loose; door slams shut.', contractorId: 'contractor-5', severity: 'Medium', status: 'accepted', reportedAt: subDays(62), targetRectificationDate: subDays(24), verifiedAt: subDays(20), acceptedAt: subDays(18), dlpExpiryDate: addDays(12) },
+];
+
+const createDrawingVersions = (
+  docId: string,
+  extension: string,
+  ownerId: string,
+  latestNote: string
+): DrawingVersion[] => [
+  {
+    id: `${docId}-v1`,
+    versionLabel: 'v1.0',
+    fileName: `${docId}-v1.${extension}`,
+    uploadedBy: ownerId,
+    uploadedAt: subDays(120),
+    note: 'Initial issue for construction handover',
+  },
+  {
+    id: `${docId}-v2`,
+    versionLabel: 'v1.1',
+    fileName: `${docId}-v2.${extension}`,
+    uploadedBy: ownerId,
+    uploadedAt: subDays(45),
+    note: latestNote,
+  },
+];
+
+export const drawingDocumentsSeed: DrawingDocument[] = [
+  { id: 'drw-1', documentNo: 'AWC-PKL-ARC-001', title: 'L1 Architectural General Arrangement', siteId: 'site-1', location: 'L1 Main Concourse', assetTag: 'ARC-ZONE-L1', format: 'CAD', discipline: 'Architecture', currentVersion: 'v1.1', uploadedBy: 'user-2', uploadedAt: subDays(45), versions: createDrawingVersions('drw-1', 'dwg', 'user-2', 'Updated tenant frontage setback line') },
+  { id: 'drw-2', documentNo: 'AWC-PKL-MEP-012', title: 'AHU Ducting Layout B2', siteId: 'site-1', location: 'B2 Plant Corridor', assetTag: 'AHU-PKL-01', format: 'PDF', discipline: 'Mechanical', currentVersion: 'v1.1', uploadedBy: 'user-5', uploadedAt: subDays(39), versions: createDrawingVersions('drw-2', 'pdf', 'user-5', 'As-built with balancing dampers') },
+  { id: 'drw-3', documentNo: 'AWC-PKL-ELV-006', title: 'Lift Control Panel Schematic', siteId: 'site-1', location: 'B3 Electrical Room', assetTag: 'LIFT-PKL-CTRL-01', format: 'CAD', discipline: 'Electrical', currentVersion: 'v1.1', uploadedBy: 'user-6', uploadedAt: subDays(36), versions: createDrawingVersions('drw-3', 'dwg', 'user-6', 'Breaker tagging revised') },
+  { id: 'drw-4', documentNo: 'AWC-SP-ARC-009', title: 'Food Court Seating Plan', siteId: 'site-2', location: 'L3 Food Court', assetTag: 'SPACE-SP-L3', format: 'JPEG', discipline: 'Architecture', currentVersion: 'v1.1', uploadedBy: 'user-3', uploadedAt: subDays(34), versions: createDrawingVersions('drw-4', 'jpg', 'user-3', 'Tenant circulation path clarified') },
+  { id: 'drw-5', documentNo: 'AWC-SP-MEP-021', title: 'Chilled Water Branch Line Diagram', siteId: 'site-2', location: 'B3 Chiller Plant', assetTag: 'CHW-SP-PLANT-02', format: 'PDF', discipline: 'Mechanical', currentVersion: 'v1.1', uploadedBy: 'user-7', uploadedAt: subDays(31), versions: createDrawingVersions('drw-5', 'pdf', 'user-7', 'Valve numbering synchronized with BMS tags') },
+  { id: 'drw-6', documentNo: 'AWC-SP-ELV-018', title: 'MDB Single Line Diagram', siteId: 'site-2', location: 'B3 Electrical Room', assetTag: 'MDB-SP-01', format: 'CAD', discipline: 'Electrical', currentVersion: 'v1.1', uploadedBy: 'user-3', uploadedAt: subDays(29), versions: createDrawingVersions('drw-6', 'dwg', 'user-3', 'Updated emergency feeder notation') },
+  { id: 'drw-7', documentNo: 'AWC-MV-ARC-003', title: 'Basement Wayfinding Signage Layout', siteId: 'site-3', location: 'B1 Car Park', assetTag: 'WAYFIND-MV-B1', format: 'JPEG', discipline: 'Architecture', currentVersion: 'v1.1', uploadedBy: 'user-4', uploadedAt: subDays(26), versions: createDrawingVersions('drw-7', 'jpg', 'user-4', 'Signage numbering updated after audit') },
+  { id: 'drw-8', documentNo: 'AWC-MV-MEP-014', title: 'Sewer Pump P&ID', siteId: 'site-3', location: 'B2 Pump Room', assetTag: 'PUMP-MV-SEW-01', format: 'PDF', discipline: 'Mechanical', currentVersion: 'v1.1', uploadedBy: 'user-6', uploadedAt: subDays(24), versions: createDrawingVersions('drw-8', 'pdf', 'user-6', 'Isolator and bypass branch added') },
+  { id: 'drw-9', documentNo: 'AWC-MV-ELV-022', title: 'Fire Alarm Loop Diagram', siteId: 'site-3', location: 'L2 Fire Command Center', assetTag: 'FA-MV-LOOP-2', format: 'CAD', discipline: 'Fire Safety', currentVersion: 'v1.1', uploadedBy: 'user-4', uploadedAt: subDays(20), versions: createDrawingVersions('drw-9', 'dwg', 'user-4', 'Address mapping corrected') },
+  { id: 'drw-10', documentNo: 'AWC-PKL-ARC-019', title: 'Roof Drainage As-Built', siteId: 'site-1', location: 'Roof Mechanical Deck', assetTag: 'ROOF-PKL-DRN', format: 'PDF', discipline: 'Civil', currentVersion: 'v1.1', uploadedBy: 'user-2', uploadedAt: subDays(16), versions: createDrawingVersions('drw-10', 'pdf', 'user-2', 'Added drain outlet invert references') },
+  { id: 'drw-11', documentNo: 'AWC-SP-IT-007', title: 'BMS Network Cabinet Layout', siteId: 'site-2', location: 'B2 ICT Room', assetTag: 'BMS-SP-NET-01', format: 'JPEG', discipline: 'IT/AV', currentVersion: 'v1.1', uploadedBy: 'user-7', uploadedAt: subDays(11), versions: createDrawingVersions('drw-11', 'jpg', 'user-7', 'Patch panel allocations refreshed') },
+  { id: 'drw-12', documentNo: 'AWC-MV-ARC-016', title: 'Tenant Utility Corridor Plan', siteId: 'site-3', location: 'L1 Service Corridor', assetTag: 'UTIL-MV-L1', format: 'CAD', discipline: 'Architecture', currentVersion: 'v1.1', uploadedBy: 'user-4', uploadedAt: subDays(8), versions: createDrawingVersions('drw-12', 'dwg', 'user-4', 'Door swing clashes resolved') },
+];
+
+export const spaceReservationsSeed: SpaceReservation[] = [
+  { id: 'res-1', siteId: 'site-1', room: 'FM Command Room', startDateTime: subDays(3), endDateTime: subDays(3 - 0.1), requester: 'Ahmad Rahman', event: 'Weekly FM Review', participants: 12, status: 'approved', requestedAt: subDays(9) },
+  { id: 'res-2', siteId: 'site-1', room: 'Training Room A', startDateTime: addDays(1), endDateTime: addDays(1.12), requester: 'Lee Wei Ming', event: 'Permit to Work Briefing', participants: 26, status: 'pending', requestedAt: subDays(1) },
+  { id: 'res-3', siteId: 'site-1', room: 'Meeting Pod 2', startDateTime: addDays(2), endDateTime: addDays(2.08), requester: 'Ravi Kumar', event: 'Vendor Coordination', participants: 6, status: 'approved', requestedAt: subDays(0.8) },
+  { id: 'res-4', siteId: 'site-2', room: 'Operations Boardroom', startDateTime: addDays(3), endDateTime: addDays(3.13), requester: 'Kumar Suresh', event: 'Monthly Safety Committee', participants: 18, status: 'approved', requestedAt: subDays(2.5) },
+  { id: 'res-5', siteId: 'site-2', room: 'Training Room B', startDateTime: addDays(4), endDateTime: addDays(4.1), requester: 'Mei Ling', event: 'BMS User Training', participants: 15, status: 'pending', requestedAt: subDays(0.5) },
+  { id: 'res-6', siteId: 'site-2', room: 'Operations Boardroom', startDateTime: addDays(4), endDateTime: addDays(4.08), requester: 'Vendor Team', event: 'Defect Handover Review', participants: 10, status: 'rejected', requestedAt: subDays(1.1), remarks: 'Conflict with internal governance session' },
+  { id: 'res-7', siteId: 'site-3', room: 'FM Command Room', startDateTime: addDays(5), endDateTime: addDays(5.12), requester: 'Fatimah Abdullah', event: 'DLP Progress Meeting', participants: 16, status: 'approved', requestedAt: subDays(2.2) },
+  { id: 'res-8', siteId: 'site-3', room: 'Meeting Pod 1', startDateTime: addDays(6), endDateTime: addDays(6.07), requester: 'Raj Krishnan', event: 'Toolbox Session', participants: 8, status: 'pending', requestedAt: subDays(1.6) },
+  { id: 'res-9', siteId: 'site-3', room: 'Training Room C', startDateTime: addDays(7), endDateTime: addDays(7.16), requester: 'Jennifer Lim', event: 'Tenant Engagement Clinic', participants: 30, status: 'approved', requestedAt: subDays(4) },
+  { id: 'res-10', siteId: 'site-1', room: 'FM Command Room', startDateTime: addDays(8), endDateTime: addDays(8.09), requester: 'Security Control', event: 'Emergency Drill Briefing', participants: 20, status: 'pending', requestedAt: subDays(0.3) },
+  { id: 'res-11', siteId: 'site-2', room: 'Meeting Pod 3', startDateTime: addDays(9), endDateTime: addDays(9.07), requester: 'Siti Norzahra', event: 'Work Order Triage', participants: 7, status: 'approved', requestedAt: subDays(1.7) },
+  { id: 'res-12', siteId: 'site-3', room: 'Operations Boardroom', startDateTime: addDays(10), endDateTime: addDays(10.12), requester: 'Contractor Coordination Team', event: 'Lifecycle Planning Workshop', participants: 14, status: 'pending', requestedAt: subDays(0.4) },
+];
+
+export const kpiMonthlyRecordsSeed: KpiMonthlyRecord[] = [
+  { id: 'kpi-2025-05', month: '2025-05', css: 77, customerRating: 79, responseTime: 96, pmCompliance: 83, woCompletion: 86, slaAdherence: 88, apdDeductionRM: 15800 },
+  { id: 'kpi-2025-06', month: '2025-06', css: 78, customerRating: 80, responseTime: 97, pmCompliance: 84, woCompletion: 87, slaAdherence: 89, apdDeductionRM: 14300 },
+  { id: 'kpi-2025-07', month: '2025-07', css: 79, customerRating: 81, responseTime: 98, pmCompliance: 85, woCompletion: 88, slaAdherence: 90, apdDeductionRM: 12800 },
+  { id: 'kpi-2025-08', month: '2025-08', css: 80, customerRating: 82, responseTime: 99, pmCompliance: 86, woCompletion: 89, slaAdherence: 91, apdDeductionRM: 11100 },
+  { id: 'kpi-2025-09', month: '2025-09', css: 81, customerRating: 82, responseTime: 98, pmCompliance: 87, woCompletion: 89, slaAdherence: 91, apdDeductionRM: 10300 },
+  { id: 'kpi-2025-10', month: '2025-10', css: 80, customerRating: 80, responseTime: 97, pmCompliance: 88, woCompletion: 90, slaAdherence: 92, apdDeductionRM: 9800 },
+  { id: 'kpi-2025-11', month: '2025-11', css: 82, customerRating: 81, responseTime: 99, pmCompliance: 89, woCompletion: 90, slaAdherence: 93, apdDeductionRM: 9100 },
+  { id: 'kpi-2025-12', month: '2025-12', css: 83, customerRating: 82, responseTime: 99, pmCompliance: 90, woCompletion: 91, slaAdherence: 93, apdDeductionRM: 8600 },
+  { id: 'kpi-2026-01', month: '2026-01', css: 82, customerRating: 83, responseTime: 100, pmCompliance: 90, woCompletion: 92, slaAdherence: 94, apdDeductionRM: 7900 },
+  { id: 'kpi-2026-02', month: '2026-02', css: 83, customerRating: 84, responseTime: 100, pmCompliance: 91, woCompletion: 93, slaAdherence: 95, apdDeductionRM: 6900 },
+  { id: 'kpi-2026-03', month: '2026-03', css: 84, customerRating: 84, responseTime: 100, pmCompliance: 92, woCompletion: 93, slaAdherence: 95, apdDeductionRM: 6200 },
+  { id: 'kpi-2026-04', month: '2026-04', css: 85, customerRating: 85, responseTime: 100, pmCompliance: 93, woCompletion: 94, slaAdherence: 96, apdDeductionRM: 5600 },
+];
+
 export const getChecklistTemplate = (faultType: string, assetType?: AssetType): WorkOrderChecklistItem[] => {
   const template = checklistTemplatesByType[faultType] || (assetType ? checklistTemplatesByType[assetType] : undefined) || checklistTemplatesByType.Other;
   return template.map((text, index) => ({
@@ -1892,6 +2126,19 @@ export const calculateAssetHealth = (
     new Date(lastCompletedPM.lastDoneDate).getTime() <= new Date(lastCompletedPM.nextDueDate).getTime()
   ) {
     score += 5;
+  }
+
+  // Factor in failure history: repeated failures = chronic reliability issue
+  const asset = assets.find(a => a.id === assetId);
+  const failureCount = asset?.failureHistory?.length || 0;
+  if (failureCount >= 4) {
+    score -= 25; // chronic failure
+  } else if (failureCount >= 3) {
+    score -= 15;
+  } else if (failureCount >= 2) {
+    score -= 8;
+  } else if (failureCount >= 1) {
+    score -= 3;
   }
 
   return Math.max(0, Math.min(100, score));

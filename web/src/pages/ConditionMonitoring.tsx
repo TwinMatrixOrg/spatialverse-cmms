@@ -71,6 +71,8 @@ const sensorStatusLabel: Record<SensorStatus, string> = {
   critical: 'Critical',
 };
 
+const monitoringPanelHeight = '80vh';
+
 type SensorSummary = {
   sensorType: SensorType;
   sensor: SensorReading;
@@ -374,8 +376,8 @@ export default function ConditionMonitoring() {
 
       <Grid container spacing={2}>
         <Grid size={{ xs: 12, md: 3 }}>
-          <Card sx={{ height: '76vh' }}>
-            <CardContent sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+          <Card sx={{ height: monitoringPanelHeight }}>
+            <CardContent sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column', gap: 1.5, minHeight: 0 }}>
               <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
                 Asset Sensor Status
               </Typography>
@@ -395,7 +397,7 @@ export default function ConditionMonitoring() {
                 <ToggleButton value="warning">Warning</ToggleButton>
                 <ToggleButton value="critical">Critical</ToggleButton>
               </ToggleButtonGroup>
-              <Stack spacing={1} sx={{ overflow: 'auto', pr: 0.5 }}>
+              <Stack spacing={1.5} sx={{ flex: 1, minHeight: 0, overflowY: 'auto', pr: 0.5 }}>
                 {filteredAssets.map((assetEntry) => (
                   <Card
                     key={assetEntry.asset.id}
@@ -408,9 +410,10 @@ export default function ConditionMonitoring() {
                           ? theme.palette.primary.main
                           : alpha(theme.palette.divider, 0.9),
                       cursor: 'pointer',
+                      flexShrink: 0,
                     }}
                   >
-                    <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
+                    <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 }, height: 108, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                       <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1, alignItems: 'center', mb: 0.8 }}>
                         <Typography variant="body2" sx={{ fontWeight: 600 }} noWrap>
                           {assetEntry.asset.name}
@@ -456,8 +459,8 @@ export default function ConditionMonitoring() {
         </Grid>
 
         <Grid size={{ xs: 12, md: 6 }}>
-          <Card sx={{ height: '76vh' }}>
-            <CardContent sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+          <Card sx={{ height: monitoringPanelHeight }}>
+            <CardContent sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column', gap: 1.5, minHeight: 0 }}>
               {selectedAsset ? (
                 <>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
@@ -481,7 +484,7 @@ export default function ConditionMonitoring() {
                     )}
                   </Box>
 
-                  <Grid container spacing={1.5} sx={{ overflow: 'auto', pr: 0.5 }}>
+                  <Grid container spacing={1.5} sx={{ flex: 1, minHeight: 0, alignContent: 'flex-start', overflowY: 'auto', pr: 0.5 }}>
                     {selectedAsset.sensors.map((sensorEntry) => {
                       const chartData = (selectedAsset.asset.sensorHistory || []).map((point) => ({
                         time: format(new Date(point.timestamp), 'HH:mm'),
@@ -536,8 +539,8 @@ export default function ConditionMonitoring() {
         </Grid>
 
         <Grid size={{ xs: 12, md: 3 }}>
-          <Card sx={{ height: '76vh' }}>
-            <CardContent sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+          <Card sx={{ height: monitoringPanelHeight }}>
+            <CardContent sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column', gap: 1.5, minHeight: 0 }}>
               <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
                 Threshold Rules
               </Typography>
@@ -593,7 +596,7 @@ export default function ConditionMonitoring() {
                 </Stack>
               </Box>
 
-              <Stack spacing={1} sx={{ flex: 1, overflow: 'auto', pr: 0.5 }}>
+              <Stack spacing={1} sx={{ flex: 1, minHeight: 0, overflowY: 'auto', pr: 0.5 }}>
                 {thresholdRules.map((rule) => (
                   <Card key={rule.id} variant="outlined" sx={{ p: 1 }}>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1 }}>

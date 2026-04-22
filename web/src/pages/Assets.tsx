@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useMemo } from 'react';
+import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -46,6 +46,11 @@ import {
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { useStore, AssetHealthBand } from '../store/useStore';
+import { useThemeContext } from '../theme/ThemeContext';
+
+const MAPTILER_KEY = '12H5hrITUbJ1sDrVPqkq';
+const MAP_STYLE_LIGHT = `https://api.maptiler.com/maps/streets-v2/style.json?key=${MAPTILER_KEY}`;
+const MAP_STYLE_DARK = `https://api.maptiler.com/maps/streets-v2-dark/style.json?key=${MAPTILER_KEY}`;
 import {
   assets,
   getSiteById,
@@ -151,6 +156,7 @@ export default function Assets() {
     assetHealthBandFilter,
     setAssetHealthBandFilter,
   } = useStore();
+  const { mode: themeMode } = useThemeContext();
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
   const [viewMode, setViewMode] = useState<'split' | 'table' | 'map'>('split');
@@ -158,6 +164,20 @@ export default function Assets() {
   const [typeFilter, setTypeFilter] = useState<AssetType | 'all'>('all');
   const [healthFilter, setHealthFilter] = useState<'all' | 'critical' | 'warning' | 'good'>('all');
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
+  const [hoveredAssetId, setHoveredAssetId] = useState<string | null>(null);
+
+  const zoomToAsset = useCallback((asset: Asset) => {
+    // Delay flyTo slightly so any view-mode switch can render the map first
+    setTimeout(() => {
+      if (map.current && asset.location) {
+        map.current.flyTo({
+          center: [asset.location.lng, asset.location.lat],
+          zoom: 16,
+          duration: 800,
+        });
+      }
+    }, 150);
+  }, []);
 
   // Auto-open asset drawer when navigated from map popup (?asset=ID)
   useEffect(() => {
@@ -207,9 +227,7 @@ export default function Assets() {
   ]);
 
   const topFailingAssets = useMemo(() => {
-    const scopedAssets = selectedSiteId ? assets.filter((asset) => asset.siteId === selectedSiteId) : assets;
-
-    return scopedAssets
+    return [...filteredAssets]
       .map((asset) => ({
         ...asset,
         failureCount: asset.failureHistory?.length || 0,
@@ -219,13 +237,12 @@ export default function Assets() {
         if (assetB.failureCount !== assetA.failureCount) {
           return assetB.failureCount - assetA.failureCount;
         }
-
         const mtbfA = assetA.mtbfDays ?? Number.MAX_SAFE_INTEGER;
         const mtbfB = assetB.mtbfDays ?? Number.MAX_SAFE_INTEGER;
         return mtbfA - mtbfB;
       })
       .slice(0, 5);
-  }, [selectedSiteId]);
+  }, [filteredAssets]);
 
   // Initialize map
   useEffect(() => {
@@ -239,24 +256,7 @@ export default function Assets() {
 
     map.current = new maplibregl.Map({
       container: mapContainer.current,
-      style: {
-        version: 8,
-        sources: {
-          osm: {
-            type: 'raster',
-            tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
-            tileSize: 256,
-            attribution: '&copy; OpenStreetMap contributors',
-          },
-        },
-        layers: [
-          {
-            id: 'osm',
-            type: 'raster',
-            source: 'osm',
-          },
-        ],
-      },
+      style: themeMode === 'dark' ? MAP_STYLE_DARK : MAP_STYLE_LIGHT,
       center,
       zoom: selectedSite ? 16 : 11,
     });
@@ -267,7 +267,14 @@ export default function Assets() {
       map.current?.remove();
       map.current = null;
     };
-  }, [viewMode]);
+  }, [viewMode, themeMode]);
+
+  // Swap map style when theme toggles (without destroying markers)
+  useEffect(() => {
+    if (!map.current) return;
+    const newStyle = themeMode === 'dark' ? MAP_STYLE_DARK : MAP_STYLE_LIGHT;
+    map.current.setStyle(newStyle);
+  }, [themeMode]);
 
   // Update markers
   useEffect(() => {
@@ -288,8 +295,9 @@ export default function Assets() {
 
       const markerEl = document.createElement('div');
       markerEl.className = 'asset-marker';
-      markerEl.style.width = '28px';
-      markerEl.style.height = '28px';
+      const isHovered = hoveredAssetId === asset.id;
+      markerEl.style.width = isHovered ? '36px' : '28px';
+      markerEl.style.height = isHovered ? '36px' : '28px';
       markerEl.style.borderRadius = '50%';
       markerEl.style.border = '3px solid white';
       markerEl.style.boxShadow = '0 2px 8px rgba(0,0,0,0.3)';
@@ -298,32 +306,44 @@ export default function Assets() {
 
       markerEl.onclick = () => setSelectedAsset(asset);
 
-      const popup = new maplibregl.Popup({ offset: 25 }).setHTML(`
-        <div style="font-family: Inter, sans-serif; padding: 4px;">
-          <strong style="font-size: 14px;">${asset.name}</strong>
-          <div style="font-size: 12px; color: #666; margin-top: 2px;">${asset.type}</div>
-          <div style="font-size: 12px; margin-top: 4px;">
-            Health: <span style="color: ${healthColors[healthStatus]}; font-weight: 600;">${healthScore}%</span>
+      const popup = new maplibregl.Popup({
+        offset: 14,
+        closeButton: false,
+        closeOnClick: false,
+        className: 'asset-hover-popup',
+      }).setHTML(`
+        <div style="font-family: Inter, sans-serif; padding: 6px 8px; min-width: 160px;">
+          <div style="font-size: 13px; font-weight: 700; color: #0A1628; margin-bottom: 2px;">${asset.name}</div>
+          <div style="font-size: 11px; color: #888; font-family: monospace; margin-bottom: 6px;">${asset.id.toUpperCase()}</div>
+          <div style="font-size: 11px; color: #555; margin-bottom: 4px;">📦 ${asset.type}${asset.floor ? ' · ' + asset.floor : ''}${asset.zone ? ' · ' + asset.zone : ''}</div>
+          <div style="font-size: 12px; display: flex; align-items: center; gap: 6px;">
+            <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:${healthColors[healthStatus]};"></span>
+            <span style="font-weight: 600; color: ${healthColors[healthStatus]};">${healthScore}% Health</span>
           </div>
-          ${openWorkOrderCount > 0 ? `<div style="font-size: 12px; color: #EF5350;">Open WOs: ${openWorkOrderCount}</div>` : ''}
+          ${openWorkOrderCount > 0 ? `<div style="font-size: 11px; color: #EF5350; margin-top: 4px;">⚠ ${openWorkOrderCount} open WO${openWorkOrderCount > 1 ? 's' : ''}</div>` : ''}
         </div>
       `);
 
-      new maplibregl.Marker({ element: markerEl })
+      const marker = new maplibregl.Marker({ element: markerEl })
         .setLngLat([asset.location.lng, asset.location.lat])
-        .setPopup(popup)
         .addTo(map.current!);
+
+      // Show popup on hover, hide on leave
+      markerEl.addEventListener('mouseenter', () => popup.addTo(map.current!).setLngLat([asset.location.lng, asset.location.lat]));
+      markerEl.addEventListener('mouseleave', () => popup.remove());
+      // Keep click to open drawer
+      markerEl.onclick = () => { popup.remove(); setSelectedAsset(asset); };
     });
 
-    // Fit bounds
-    if (filteredAssets.length > 1 && map.current) {
+    // Fit bounds only when no asset is hovered (don't override flyTo)
+    if (!hoveredAssetId && filteredAssets.length > 1 && map.current) {
       const bounds = new maplibregl.LngLatBounds();
       filteredAssets.forEach(asset => {
         bounds.extend([asset.location.lng, asset.location.lat]);
       });
       map.current.fitBounds(bounds, { padding: 50 });
     }
-  }, [filteredAssets, viewMode, workOrders, pmSchedules]);
+  }, [filteredAssets, viewMode, workOrders, pmSchedules, hoveredAssetId]);
 
   return (
     <Box
@@ -441,13 +461,23 @@ export default function Assets() {
                 return (
                   <Box
                     key={asset.id}
+                    onClick={() => setSelectedAsset(asset)}
+                    onMouseEnter={() => {
+                      setHoveredAssetId(asset.id);
+                      zoomToAsset(asset);
+                      if (viewMode === 'table') setViewMode('split');
+                    }}
+                    onMouseLeave={() => setHoveredAssetId(null)}
                     sx={{
                       border: '1px solid',
-                      borderColor: 'divider',
+                      borderColor: hoveredAssetId === asset.id ? '#00BCD4' : 'divider',
                       borderRadius: 2,
                       px: 1.5,
                       py: 1,
                       minWidth: 180,
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                      backgroundColor: hoveredAssetId === asset.id ? 'rgba(0,188,212,0.08)' : 'transparent',
                     }}
                   >
                     <Typography variant="body2" fontWeight={600}>
@@ -511,7 +541,17 @@ export default function Assets() {
                       key={asset.id}
                       hover
                       onClick={() => setSelectedAsset(asset)}
-                      sx={{ cursor: 'pointer' }}
+                      onMouseEnter={() => {
+                        setHoveredAssetId(asset.id);
+                        zoomToAsset(asset);
+                        if (viewMode === 'table') setViewMode('split');
+                      }}
+                      onMouseLeave={() => setHoveredAssetId(null)}
+                      sx={{
+                        cursor: 'pointer',
+                        backgroundColor: hoveredAssetId === asset.id ? 'rgba(0,188,212,0.08)' : 'inherit',
+                        '&:hover': { backgroundColor: 'rgba(0,188,212,0.08) !important' },
+                      }}
                     >
                       <TableCell>
                         <Typography variant="body2" fontWeight={600}>

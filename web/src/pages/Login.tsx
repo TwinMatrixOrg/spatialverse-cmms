@@ -86,7 +86,7 @@ export default function Login() {
                 SpatialVerse Pulse
               </Typography>
               <Typography variant="caption" sx={{ color: 'text.secondary', letterSpacing: '0.08em' }}>
-                CMMS Sign In
+                Sign In
               </Typography>
             </Box>
           </Box>
@@ -112,9 +112,6 @@ export default function Login() {
               <Button type="submit" variant="contained" size="large" fullWidth>
                 Sign In
               </Button>
-              <Typography variant="caption" sx={{ textAlign: 'center', color: 'rgba(255, 255, 255, 0.5)' }}>
-                Demo: sandbox / sandbox
-              </Typography>
             </Stack>
           </Box>
         </Stack>
