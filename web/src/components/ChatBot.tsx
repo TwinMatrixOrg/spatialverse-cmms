@@ -163,6 +163,8 @@ export default function ChatBot() {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
+  const [thinking, setThinking] = useState(false);
+  const [typingText, setTypingText] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const pageFaq = PAGE_FAQS[location.pathname] || DEFAULT_FAQ;
@@ -207,20 +209,51 @@ export default function ChatBot() {
     return pageFaq.responses['default'];
   };
 
+  const simulateResponse = (responseText: string) => {
+    setThinking(true);
+    // Phase 1: thinking dots (600ms)
+    setTimeout(() => {
+      setThinking(false);
+      setTypingText('');
+      // Phase 2: token-by-token reveal
+      const botId = Date.now() + 2;
+      setMessages(prev => [...prev, { id: botId, text: '', sender: 'bot', timestamp: new Date() }]);
+      const words = responseText.split(' ');
+      let idx = 0;
+      const interval = setInterval(() => {
+        idx++;
+        const partial = words.slice(0, idx).join(' ');
+        setMessages(prev => prev.map(m => m.id === botId ? { ...m, text: partial } : m));
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        if (idx >= words.length) {
+          clearInterval(interval);
+          setTypingText('');
+        }
+      }, 30 + Math.random() * 20); // variable speed for realism
+    }, 800 + Math.random() * 400);
+    // Animate thinking dots
+    let dots = 0;
+    const dotInterval = setInterval(() => {
+      dots = (dots + 1) % 4;
+      setTypingText('Thinking' + '.'.repeat(dots));
+    }, 200);
+    setTimeout(() => clearInterval(dotInterval), 1200);
+  };
+
   const handleSend = () => {
     if (!input.trim()) return;
     const userMsg: Message = { id: Date.now(), text: input, sender: 'user', timestamp: new Date() };
-    const response = findResponse(input);
-    const botMsg: Message = { id: Date.now() + 1, text: response, sender: 'bot', timestamp: new Date() };
-    setMessages(prev => [...prev, userMsg, botMsg]);
+    setMessages(prev => [...prev, userMsg]);
     setInput('');
+    const response = findResponse(input);
+    simulateResponse(response);
   };
 
   const handleQuickQuestion = (q: string) => {
     const userMsg: Message = { id: Date.now(), text: q, sender: 'user', timestamp: new Date() };
+    setMessages(prev => [...prev, userMsg]);
     const response = findResponse(q);
-    const botMsg: Message = { id: Date.now() + 1, text: response, sender: 'bot', timestamp: new Date() };
-    setMessages(prev => [...prev, userMsg, botMsg]);
+    simulateResponse(response);
   };
 
   return (
@@ -298,6 +331,35 @@ export default function ChatBot() {
                 </Box>
               </Box>
             ))}
+            {thinking && (
+              <Box sx={{ alignSelf: 'flex-start', maxWidth: '85%' }}>
+                <Box sx={{
+                  p: 1.5, borderRadius: 2, borderBottomLeftRadius: 4,
+                  bgcolor: alpha(theme.palette.mode === 'dark' ? '#1e293b' : '#f1f5f9', 1),
+                  border: `1px solid ${alpha(theme.palette.mode === 'dark' ? '#334155' : '#e2e8f0', 0.5)}`,
+                  display: 'flex', alignItems: 'center', gap: 1,
+                }}>
+                  <Box sx={{
+                    '@keyframes thinkPulse': {
+                      '0%, 100%': { opacity: 0.4 },
+                      '50%': { opacity: 1 },
+                    },
+                    display: 'flex', gap: 0.5,
+                  }}>
+                    {[0, 1, 2].map(i => (
+                      <Box key={i} sx={{
+                        width: 6, height: 6, borderRadius: '50%',
+                        bgcolor: 'primary.main',
+                        animation: `thinkPulse 1.2s ease-in-out ${i * 0.2}s infinite`,
+                      }} />
+                    ))}
+                  </Box>
+                  <Typography variant="caption" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+                    {typingText || 'Thinking...'}
+                  </Typography>
+                </Box>
+              </Box>
+            )}
             <div ref={messagesEndRef} />
           </Box>
 
@@ -310,6 +372,7 @@ export default function ChatBot() {
                 size="small"
                 variant="outlined"
                 clickable
+                disabled={thinking}
                 onClick={() => handleQuickQuestion(q)}
                 sx={{
                   fontSize: '0.7rem', height: 26, maxWidth: '100%',
@@ -337,7 +400,7 @@ export default function ChatBot() {
                 '& .MuiInputBase-input::placeholder': { color: alpha(theme.palette.text.secondary, 0.7), opacity: 1 },
               }}
             />
-            <IconButton onClick={handleSend} color="primary" sx={{ flexShrink: 0 }}>
+            <IconButton onClick={handleSend} color="primary" sx={{ flexShrink: 0 }} disabled={thinking}>
               <SendIcon />
             </IconButton>
           </Box>
