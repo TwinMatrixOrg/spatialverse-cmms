@@ -41,6 +41,113 @@ interface TPATAForm {
   icon: string;
 }
 
+interface CompletedForm {
+  id: string;
+  templateId: string;
+  completedCode: string;
+  site: string;
+  inspector: string;
+  date: string;
+  status: 'completed' | 'in_progress' | 'draft';
+  passCount: number;
+  failCount: number;
+  values: Record<string, unknown>;
+}
+
+// ── Pre-defined completed forms (demo) ──────────────────────────
+const COMPLETED_FORMS: CompletedForm[] = [
+  {
+    id: 'cf-1',
+    templateId: 'tp-01',
+    completedCode: 'TPATA-F1-2026-0042',
+    site: 'Pavilion KL, Block A',
+    inspector: 'Raj Krishnan',
+    date: '2026-04-18',
+    status: 'completed',
+    passCount: 14,
+    failCount: 2,
+    values: {
+      'f1-1': 'Pavilion KL, Block A',
+      'f1-2': '2026-04-18',
+      'f1-3': 'Raj Krishnan',
+      'f1-4': 'EL-2024-MY-88231',
+      'f1-5': 'pass',
+      'f1-6': 'pass',
+      'f1-7': 'fail',
+      'f1-8': 'pass',
+      'f1-9': 'pass',
+      'f1-10': '0.4',
+      'f1-11': 'pass',
+      'f1-12': 'pass',
+      'f1-13': 'fail',
+      'f1-14': '2.8',
+      'f1-15': 'pass',
+      'f1-16': 'pass',
+      'f1-17': 'Phase imbalance on L3 (load 38A vs L1 25A). Trunking corrosion near B1 carpark — schedule replacement.',
+      'f1-18': 'Raj Krishnan',
+    },
+  },
+  {
+    id: 'cf-2',
+    templateId: 'tp-03',
+    completedCode: 'TPATA-F3-2026-0018',
+    site: 'Pavilion KL, Block A',
+    inspector: 'Ahmad Faisal',
+    date: '2026-04-20',
+    status: 'completed',
+    passCount: 11,
+    failCount: 1,
+    values: {
+      'f3-1': 'Pavilion KL, Block A',
+      'f3-2': '2026-04-20',
+      'f3-3': 'Ahmad Faisal',
+      'f3-4': '2026-09-15',
+      'f3-5': 'pass',
+      'f3-6': '12.5',
+      'f3-7': 'pass',
+      'f3-8': 'Normal',
+      'f3-9': '25',
+      'f3-10': 'pass',
+      'f3-11': 'pass',
+      'f3-12': 'pass',
+      'f3-13': 'pass',
+      'f3-14': 'fail',
+      'f3-15': 'pass',
+      'f3-16': 'Minor',
+      'f3-17': 'Exit sign on L8 corridor not illuminated — bulb replacement needed. All other systems nominal. BOMBA certificate valid until Sep 2026.',
+      'f3-18': 'Ahmad Faisal',
+    },
+  },
+  {
+    id: 'cf-3',
+    templateId: 'tp-07',
+    completedCode: 'TPATA-F7-2026-0055',
+    site: 'KLCC East Wing',
+    inspector: 'Siti Nurhaliza',
+    date: '2026-04-22',
+    status: 'completed',
+    passCount: 8,
+    failCount: 1,
+    values: {
+      'f7-1': 'KLCC East Wing',
+      'f7-2': '2026-04-22',
+      'f7-3': 'Siti Nurhaliza',
+      'f7-4': 'Washrooms',
+      'f7-5': '4',
+      'f7-6': 'pass',
+      'f7-7': '3',
+      'f7-8': 'pass',
+      'f7-9': 'pass',
+      'f7-10': 'fail',
+      'f7-11': 'no',
+      'f7-12': 'pass',
+      'f7-13': '7',
+      'f7-14': 'Recycling bins missing near east pantry. Floor 12 washroom soap dispenser empty — restock required.',
+      'f7-15': 'Siti Nurhaliza',
+    },
+  },
+];
+
 // ── Pre-defined TPATA Form Templates ─────────────────────────────
 const TPATA_TEMPLATES: TPATAForm[] = [
   {
@@ -513,6 +620,60 @@ export default function TPATAForms() {
                 </Card>
               </Grid>
             ))}
+          </Grid>
+        </AnimatedPanel>
+
+        {/* Completed Forms (Demo) */}
+        <AnimatedPanel delay={2}>
+          <Typography variant="h6" fontWeight={700} sx={{ mt: 4, mb: 2 }}>Recent Completed Inspections</Typography>
+          <Grid container spacing={2}>
+            {COMPLETED_FORMS.map(cf => {
+              const template = TPATA_TEMPLATES.find(t => t.id === cf.templateId);
+              return (
+                <Grid size={{ xs: 12, md: 4 }} key={cf.id}>
+                  <Card sx={{
+                    cursor: 'pointer',
+                    border: `1px solid ${alpha(theme.palette.primary.main, 0.12)}`,
+                    transition: 'all 0.2s ease',
+                    '&:hover': {
+                      borderColor: theme.palette.primary.main,
+                      transform: 'translateY(-2px)',
+                      boxShadow: `0 4px 20px ${alpha(theme.palette.primary.main, 0.15)}`,
+                    },
+                  }} onClick={() => {
+                    if (template) {
+                      setSelectedForm(template);
+                      setFormValues(cf.values);
+                      setDrawerOpen(true);
+                    }
+                  }}>
+                    <CardContent sx={{ p: 2 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Typography sx={{ fontSize: '1.3rem' }}>{template?.icon || '📋'}</Typography>
+                          <Typography variant="subtitle2" fontWeight={700}>{cf.completedCode}</Typography>
+                        </Box>
+                        <Chip size="small" label={cf.status} color={cf.status === 'completed' ? 'success' : cf.status === 'in_progress' ? 'warning' : 'default'} />
+                      </Box>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                        {template?.name || 'Unknown Form'}
+                      </Typography>
+                      <Box sx={{ display: 'flex', gap: 1, mb: 1 }}>
+                        <Chip size="small" label={cf.site} variant="outlined" />
+                        <Chip size="small" label={new Date(cf.date).toLocaleDateString('en-MY', { day: 'numeric', month: 'short' })} variant="outlined" />
+                      </Box>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 1.5 }}>
+                        <Typography variant="caption" color="text.secondary">Inspector: {cf.inspector}</Typography>
+                        <Box sx={{ display: 'flex', gap: 0.5 }}>
+                          <Chip size="small" label={`✓ ${cf.passCount}`} sx={{ bgcolor: alpha('#22c55e', 0.1), color: '#16a34a', fontSize: '0.7rem', height: 20 }} />
+                          {cf.failCount > 0 && <Chip size="small" label={`✗ ${cf.failCount}`} sx={{ bgcolor: alpha('#ef4444', 0.1), color: '#dc2626', fontSize: '0.7rem', height: 20 }} />}
+                        </Box>
+                      </Box>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              );
+            })}
           </Grid>
         </AnimatedPanel>
 
