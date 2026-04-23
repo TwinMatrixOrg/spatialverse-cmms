@@ -735,6 +735,62 @@ export default function Dashboard() {
       <Grid container spacing={{ xs: 2, md: 3 }}>
         <Grid size={{ xs: 12, md: 6 }}>
           <Grid container spacing={3} sx={{ height: '100%' }}>
+            {/* Active Alerts */}
+            <Grid size={{ xs: 12 }}>
+              <Card sx={{ height: 200 }}>
+                <CardContent sx={{ p: 0, height: '100%', display: 'flex', flexDirection: 'column' }}>
+                  <Box sx={{ px: 2.5, py: 1.5, borderBottom: '1px solid', borderColor: 'divider', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                      Active Alerts
+                    </Typography>
+                    <Chip
+                      size="small"
+                      label={`${activeAlerts.length} active`}
+                      color="error"
+                      sx={{ height: 22 }}
+                    />
+                  </Box>
+                  <List dense sx={{ flex: 1, overflow: 'auto', py: 0 }}>
+                    {activeAlerts.map((alert) => (
+                      <ListItem
+                        key={alert.id}
+                        sx={{
+                          py: 1,
+                          borderLeft: `3px solid ${alert.severity === 'critical' ? '#EF5350' : '#FFA726'}`,
+                        }}
+                      >
+                        <ListItemAvatar sx={{ minWidth: 36 }}>
+                          <ErrorIcon
+                            sx={{
+                              color: alert.severity === 'critical' ? '#EF5350' : '#FFA726',
+                              fontSize: 20,
+                            }}
+                          />
+                        </ListItemAvatar>
+                        <ListItemText
+                          primary={
+                            <Typography variant="body2" fontWeight={500}>
+                              {alert.title}
+                            </Typography>
+                          }
+                          secondary={
+                            <Typography variant="caption" color="text.secondary" sx={{
+                              display: 'block',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                            }}>
+                              {alert.description}
+                            </Typography>
+                          }
+                        />
+                      </ListItem>
+                    ))}
+                  </List>
+                </CardContent>
+              </Card>
+            </Grid>
+
             {/* Upcoming PM */}
             <Grid size={{ xs: 12 }}>
               <Card sx={{ height: 240 }}>
@@ -801,62 +857,6 @@ export default function Dashboard() {
                         />
                       </ListItem>
                     )}
-                  </List>
-                </CardContent>
-              </Card>
-            </Grid>
-
-            {/* Active Alerts */}
-            <Grid size={{ xs: 12 }}>
-              <Card sx={{ height: 200 }}>
-                <CardContent sx={{ p: 0, height: '100%', display: 'flex', flexDirection: 'column' }}>
-                  <Box sx={{ px: 2.5, py: 1.5, borderBottom: '1px solid', borderColor: 'divider', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-                      Active Alerts
-                    </Typography>
-                    <Chip
-                      size="small"
-                      label={`${activeAlerts.length} active`}
-                      color="error"
-                      sx={{ height: 22 }}
-                    />
-                  </Box>
-                  <List dense sx={{ flex: 1, overflow: 'auto', py: 0 }}>
-                    {activeAlerts.map((alert) => (
-                      <ListItem
-                        key={alert.id}
-                        sx={{
-                          py: 1,
-                          borderLeft: `3px solid ${alert.severity === 'critical' ? '#EF5350' : '#FFA726'}`,
-                        }}
-                      >
-                        <ListItemAvatar sx={{ minWidth: 36 }}>
-                          <ErrorIcon
-                            sx={{
-                              color: alert.severity === 'critical' ? '#EF5350' : '#FFA726',
-                              fontSize: 20,
-                            }}
-                          />
-                        </ListItemAvatar>
-                        <ListItemText
-                          primary={
-                            <Typography variant="body2" fontWeight={500}>
-                              {alert.title}
-                            </Typography>
-                          }
-                          secondary={
-                            <Typography variant="caption" color="text.secondary" sx={{
-                              display: 'block',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap',
-                            }}>
-                              {alert.description}
-                            </Typography>
-                          }
-                        />
-                      </ListItem>
-                    ))}
                   </List>
                 </CardContent>
               </Card>
