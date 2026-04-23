@@ -29,6 +29,10 @@ import {
   ListItemText,
   ListItemIcon,
   Popover,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
   Snackbar,
   Alert,
   useTheme,
@@ -43,6 +47,7 @@ import {
   Close as CloseIcon,
   CheckCircle as CheckIcon,
   Circle as CircleIcon,
+  Add as AddIcon,
   Checklist as ChecklistIcon,
   AddTask as AddTaskIcon,
 } from '@mui/icons-material';
@@ -222,6 +227,10 @@ export default function PMSchedules() {
   const [selectedChecklistType, setSelectedChecklistType] = useState<AssetType | null>(null);
   const [checklistTitle, setChecklistTitle] = useState('');
   const [snackbarMessage, setSnackbarMessage] = useState('');
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [newPMType, setNewPMType] = useState<string>('');
+  const [newPMName, setNewPMName] = useState('');
+  const [newPMFreq, setNewPMFreq] = useState<string>('monthly');
 
   const filteredPMs = useMemo(() => {
     return pmSchedules.filter(pm => {
@@ -291,6 +300,9 @@ export default function PMSchedules() {
         <Typography variant="h4" sx={{ fontWeight: 700, fontSize: { xs: '1.65rem', sm: '2rem' } }}>
           PM Schedules
         </Typography>
+        <Button variant="contained" startIcon={<AddIcon />} onClick={() => setCreateDialogOpen(true)} size="small">
+          New PM Schedule
+        </Button>
       </Box>
 
       {/* Filters */}
@@ -701,6 +713,51 @@ export default function PMSchedules() {
           </Box>
         </Box>
       </Drawer>
+
+      {/* Create PM Schedule Dialog */}
+      <Dialog open={createDialogOpen} onClose={() => setCreateDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Create New PM Schedule</DialogTitle>
+        <DialogContent>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
+            <TextField label="Schedule Name" value={newPMName} onChange={(e) => setNewPMName(e.target.value)} fullWidth size="small" />
+            <FormControl fullWidth size="small">
+              <InputLabel>Template / Type</InputLabel>
+              <Select value={newPMType} onChange={(e) => setNewPMType(e.target.value)} label="Template / Type">
+                {Object.keys(checklistTemplates).map((type) => (
+                  <MenuItem key={type} value={type}>{type}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            {newPMType && checklistTemplates[newPMType] && (
+              <Box sx={{ p: 2, bgcolor: 'background.default', borderRadius: 1 }}>
+                <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>Preview checklist:</Typography>
+                {checklistTemplates[newPMType].map((item, i) => (
+                  <Typography key={i} variant="body2" sx={{ fontSize: '0.85rem' }}>• {item}</Typography>
+                ))}
+              </Box>
+            )}
+            <FormControl fullWidth size="small">
+              <InputLabel>Frequency</InputLabel>
+              <Select value={newPMFreq} onChange={(e) => setNewPMFreq(e.target.value)} label="Frequency">
+                <MenuItem value="daily">Daily</MenuItem>
+                <MenuItem value="weekly">Weekly</MenuItem>
+                <MenuItem value="monthly">Monthly</MenuItem>
+                <MenuItem value="quarterly">Quarterly</MenuItem>
+                <MenuItem value="yearly">Yearly</MenuItem>
+              </Select>
+            </FormControl>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setCreateDialogOpen(false)}>Cancel</Button>
+          <Button variant="contained" onClick={() => {
+            setSelectedChecklistType((newPMType || 'General') as AssetType);
+            setChecklistTitle(`${newPMName || 'New PM'} — ${newPMType || 'General'} Template`);
+            setCreateDialogOpen(false);
+            setSnackbarMessage(`PM schedule template '${newPMType}' selected`);
+          }} disabled={!newPMName}>Create</Button>
+        </DialogActions>
+      </Dialog>
 
       <Snackbar
         open={Boolean(snackbarMessage)}
