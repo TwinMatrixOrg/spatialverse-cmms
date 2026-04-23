@@ -16,6 +16,7 @@ import {
   Divider,
   Alert,
   Snackbar,
+  IconButton,
   useTheme,
   alpha,
 } from '@mui/material';
@@ -40,6 +41,7 @@ import BoltIcon from '@mui/icons-material/Bolt';
 import KpiIcon from '@mui/icons-material/Speed';
 import SensorIcon from '@mui/icons-material/Sensors';
 import ReportIcon from '@mui/icons-material/Assessment';
+import CloseIcon from '@mui/icons-material/Close';
 import type { ReactNode } from 'react';
 import { useThemeContext } from '../theme/ThemeContext';
 import { useStore } from '../store/useStore';
@@ -277,7 +279,7 @@ export default function Dashboard() {
     try { const s = JSON.parse(localStorage.getItem('pulse-dash-order') || '[]'); return s.length ? s : [...DASHBOARD_SECTIONS]; } catch { return [...DASHBOARD_SECTIONS]; }
   });
   const [dragOver, setDragOver] = useState<string | null>(null);
-  const { publishedApps } = useStore();
+  const { publishedApps, togglePublishedApp } = useStore();
 
   const handleSectionDrop = (from: string, to: string) => {
     const newOrder = [...sectionOrder];
@@ -920,7 +922,12 @@ export default function Dashboard() {
                             <Typography variant="caption" color="text.secondary">{app.desc}</Typography>
                           </Box>
                         </Box>
-                        <DragIndicatorIcon sx={{ color: 'text.disabled', cursor: 'grab', '&:hover': { color: 'text.secondary' } }} />
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                          <IconButton size="small" onClick={() => togglePublishedApp(appId)} sx={{ opacity: 0.4, '&:hover': { opacity: 1, color: 'error.main' } }}>
+                            <CloseIcon sx={{ fontSize: 16 }} />
+                          </IconButton>
+                          <DragIndicatorIcon sx={{ color: 'text.disabled', cursor: 'grab', '&:hover': { color: 'text.secondary' } }} />
+                        </Box>
                       </Box>
                       <Box sx={{ mt: 1.5, p: 1.5, bgcolor: alpha(app.color, 0.06), borderRadius: 1, textAlign: 'center' }}>
                         <Typography variant="h5" fontWeight={800} sx={{ color: app.color }}>{app.value}</Typography>
