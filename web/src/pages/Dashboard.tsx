@@ -730,14 +730,12 @@ export default function Dashboard() {
           </DashboardSection>
         );
 
-        if (sectionId === 'pm-alerts') return (
+                if (sectionId === 'pm-alerts') return (
           <DashboardSection key="pm-alerts" id="pm-alerts" isOver={over} onDrag={handleSectionDrop}>
       <Grid container spacing={{ xs: 2, md: 3 }}>
+        {/* Active Alerts — left */}
         <Grid size={{ xs: 12, md: 6 }}>
-          <Grid container spacing={3} sx={{ height: '100%' }}>
-            {/* Active Alerts */}
-            <Grid size={{ xs: 12 }}>
-              <Card sx={{ height: 200 }}>
+              <Card sx={{ height: '100%', minHeight: 400 }}>
                 <CardContent sx={{ p: 0, height: '100%', display: 'flex', flexDirection: 'column' }}>
                   <Box sx={{ px: 2.5, py: 1.5, borderBottom: '1px solid', borderColor: 'divider', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
@@ -789,11 +787,11 @@ export default function Dashboard() {
                   </List>
                 </CardContent>
               </Card>
-            </Grid>
+        </Grid>
 
-            {/* Upcoming PM */}
-            <Grid size={{ xs: 12 }}>
-              <Card sx={{ height: 240 }}>
+        {/* Upcoming PM — right */}
+        <Grid size={{ xs: 12, md: 6 }}>
+              <Card sx={{ height: '100%', minHeight: 400 }}>
                 <CardContent sx={{ p: 0, height: '100%', display: 'flex', flexDirection: 'column' }}>
                   <Box sx={{ px: 2.5, py: 1.5, borderBottom: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
@@ -860,8 +858,6 @@ export default function Dashboard() {
                   </List>
                 </CardContent>
               </Card>
-            </Grid>
-          </Grid>
         </Grid>
       </Grid>
           </DashboardSection>
