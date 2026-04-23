@@ -264,15 +264,24 @@ export default function ChatBot() {
           onClick={() => setOpen(true)}
           sx={{
             position: 'fixed', bottom: 24, right: 24, zIndex: 1300,
-            width: 56, height: 56, borderRadius: '50%', cursor: 'pointer',
-            background: 'linear-gradient(135deg, #0A4D8C 0%, #00A3A1 100%)',
+            width: 60, height: 60, borderRadius: '50%', cursor: 'pointer',
+            overflow: 'hidden',
             boxShadow: '0 4px 20px rgba(0,163,161,0.4)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            transition: 'transform 0.2s ease, box-shadow 0.2s ease',
-            '&:hover': { transform: 'scale(1.1)', boxShadow: '0 6px 24px rgba(0,163,161,0.5)' },
+            '@keyframes floatBot': {
+              '0%, 100%': { transform: 'translateY(0)' },
+              '50%': { transform: 'translateY(-6px)' },
+            },
+            animation: 'floatBot 3s ease-in-out infinite',
+            '&:hover': { animation: 'none', transform: 'scale(1.12)', boxShadow: '0 6px 24px rgba(0,163,161,0.5)' },
           }}
         >
-          <ChatIcon sx={{ color: '#fff', fontSize: 28 }} />
+          <Box
+            component="img"
+            src="/v2/chatbot-icon-4.jpg"
+            alt="Pulse Assistant"
+            sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          />
         </Box>
       )}
 
@@ -297,9 +306,7 @@ export default function ChatBot() {
             background: 'linear-gradient(135deg, #0A4D8C 0%, #00A3A1 100%)', color: '#fff',
           }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)', width: 32, height: 32 }}>
-                <BotIcon sx={{ fontSize: 18 }} />
-              </Avatar>
+              <Avatar src="/v2/chatbot-icon-4.jpg" sx={{ width: 32, height: 32, bgcolor: 'rgba(255,255,255,0.2)' }} />
               <Box>
                 <Typography variant="subtitle2" fontWeight={700} sx={{ lineHeight: 1.2 }}>Pulse Assistant</Typography>
                 <Typography variant="caption" sx={{ opacity: 0.8 }}>{pageFaq.icon} {pageFaq.label}</Typography>
