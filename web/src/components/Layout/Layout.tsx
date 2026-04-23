@@ -3,6 +3,7 @@ import { Outlet, useLocation } from 'react-router-dom';
 import { Box, useMediaQuery, useTheme } from '@mui/material';
 import Sidebar from './Sidebar';
 import TopBar from './TopBar';
+import ChatBot from '../ChatBot';
 import { useStore } from '../../store/useStore';
 
 const DRAWER_WIDTH = 260;
@@ -82,6 +83,7 @@ export default function Layout() {
           </Box>
         </Box>
       </Box>
+      <ChatBot />
     </Box>
   );
 }
