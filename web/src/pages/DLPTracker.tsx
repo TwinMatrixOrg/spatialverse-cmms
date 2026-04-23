@@ -1,3 +1,4 @@
+import { AnimatedPanel } from '../components/AnimatedPage';
 import { useMemo, useState } from 'react';
 import {
   Alert,
@@ -146,6 +147,7 @@ export default function DLPTracker() {
         </Box>
       </Box>
 
+      <AnimatedPanel delay={1}>
       <Grid container spacing={2} sx={{ mb: 3 }}>
         {statusCounts.map((statusCount) => (
           <Grid key={statusCount.status} size={{ xs: 12, sm: 6, md: 3 }}>
@@ -295,7 +297,9 @@ export default function DLPTracker() {
           </Card>
         </Grid>
       </Grid>
+      </AnimatedPanel>
 
+      <AnimatedPanel delay={2}>
       <Card>
         <CardContent>
           <Box sx={{ display: 'flex', gap: 1.5, mb: 2, flexWrap: 'wrap' }}>
@@ -427,6 +431,7 @@ export default function DLPTracker() {
           </TableContainer>
         </CardContent>
       </Card>
+      </AnimatedPanel>
     </Box>
   );
 }

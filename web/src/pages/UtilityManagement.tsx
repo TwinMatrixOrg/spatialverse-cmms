@@ -1,3 +1,4 @@
+import { AnimatedPanel } from '../components/AnimatedPage';
 import { useMemo, useState } from 'react';
 import {
   Box,
@@ -271,6 +272,7 @@ export default function UtilityManagement() {
         </Grid>
       </Grid>
 
+      <AnimatedPanel delay={1}>
       <Grid container spacing={2} sx={{ mb: 3 }}>
         <Grid size={{ xs: 12, lg: 6 }}>
           <Card sx={{ height: '100%' }}>
@@ -475,7 +477,9 @@ export default function UtilityManagement() {
           </Card>
         </Grid>
       </Grid>
+      </AnimatedPanel>
 
+      <AnimatedPanel delay={2}>
       <Grid container spacing={2} sx={{ mb: 3 }}>
         <Grid size={{ xs: 12, lg: 8 }}>
           <Card>
@@ -531,7 +535,9 @@ export default function UtilityManagement() {
           </Card>
         </Grid>
       </Grid>
+      </AnimatedPanel>
 
+      <AnimatedPanel delay={3}>
       <Card>
         <CardContent>
           <Box sx={{ display: 'flex', gap: 1.5, mb: 2, flexWrap: 'wrap' }}>
@@ -607,6 +613,7 @@ export default function UtilityManagement() {
           </TableContainer>
         </CardContent>
       </Card>
+      </AnimatedPanel>
     </Box>
   );
 }

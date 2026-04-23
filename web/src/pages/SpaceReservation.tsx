@@ -1,3 +1,4 @@
+import { AnimatedPanel } from '../components/AnimatedPage';
 import { useMemo, useState } from 'react';
 import {
   Alert,
@@ -164,6 +165,7 @@ export default function SpaceReservation() {
 
       {conflictMessage && <Alert severity="error" sx={{ mb: 2 }}>{conflictMessage}</Alert>}
 
+      <AnimatedPanel delay={1}>
       <Grid container spacing={2} sx={{ mb: 3 }}>
         <Grid size={{ xs: 12, lg: 5 }}>
           <Card sx={{ height: '100%' }}>
@@ -334,7 +336,9 @@ export default function SpaceReservation() {
           </Card>
         </Grid>
       </Grid>
+      </AnimatedPanel>
 
+      <AnimatedPanel delay={2}>
       <Card>
         <CardContent>
           <Box sx={{ display: 'flex', gap: 1.5, mb: 2, flexWrap: 'wrap' }}>
@@ -437,6 +441,7 @@ export default function SpaceReservation() {
           </TableContainer>
         </CardContent>
       </Card>
+      </AnimatedPanel>
     </Box>
   );
 }

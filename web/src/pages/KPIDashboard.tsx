@@ -1,3 +1,4 @@
+import { AnimatedPanel } from '../components/AnimatedPage';
 import { useMemo, useState } from 'react';
 import {
   Box,
@@ -144,6 +145,7 @@ export default function KPIDashboard() {
         </Button>
       </Box>
 
+      <AnimatedPanel delay={1}>
       <Grid container spacing={2} sx={{ mb: 3 }}>
         {metricConfig.map((metric) => {
           const currentValue = latestRecord ? latestRecord[metric.key] : 0;
@@ -171,7 +173,9 @@ export default function KPIDashboard() {
           );
         })}
       </Grid>
+      </AnimatedPanel>
 
+      <AnimatedPanel delay={2}>
       <Grid container spacing={2} sx={{ mb: 3 }}>
         <Grid size={{ xs: 12, lg: 8 }}>
           <Card>
@@ -239,7 +243,9 @@ export default function KPIDashboard() {
           </Card>
         </Grid>
       </Grid>
+      </AnimatedPanel>
 
+      <AnimatedPanel delay={3}>
       <Card>
         <CardContent>
           <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
@@ -281,6 +287,7 @@ export default function KPIDashboard() {
           </TableContainer>
         </CardContent>
       </Card>
+      </AnimatedPanel>
     </Box>
   );
 }

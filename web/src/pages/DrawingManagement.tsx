@@ -1,3 +1,4 @@
+import { AnimatedPanel } from '../components/AnimatedPage';
 import { ChangeEvent, DragEvent, useMemo, useRef, useState } from 'react';
 import {
   Box,
@@ -175,6 +176,7 @@ export default function DrawingManagement() {
         </Box>
       </Box>
 
+      <AnimatedPanel delay={1}>
       <Grid container spacing={2} sx={{ mb: 3 }}>
         <Grid size={{ xs: 12, lg: 5 }}>
           <Card sx={{ height: '100%' }}>
@@ -388,6 +390,9 @@ export default function DrawingManagement() {
         </Grid>
       </Grid>
 
+      </AnimatedPanel>
+
+      <AnimatedPanel delay={2}>
       <Card>
         <CardContent>
           <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', mb: 2 }}>
@@ -485,6 +490,7 @@ export default function DrawingManagement() {
           </TableContainer>
         </CardContent>
       </Card>
+      </AnimatedPanel>
     </Box>
   );
 }

@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import { Box, useMediaQuery, useTheme } from '@mui/material';
+import { AnimatePresence, motion } from 'framer-motion';
 import Sidebar from './Sidebar';
 import TopBar from './TopBar';
 import { useStore } from '../../store/useStore';
@@ -13,6 +14,7 @@ export default function Layout() {
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const { sidebarOpen, setSidebarOpen } = useStore();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const location = useLocation();
 
   const handleDrawerToggle = () => {
     if (isMobile) {
@@ -66,7 +68,18 @@ export default function Layout() {
             overflowX: 'hidden',
           }}
         >
-          <Outlet />
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={location.pathname}
+              initial={{ opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.35 }}
+              style={{ width: '100%' }}
+            >
+              <Outlet />
+            </motion.div>
+          </AnimatePresence>
         </Box>
       </Box>
     </Box>
