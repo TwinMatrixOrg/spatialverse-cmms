@@ -66,14 +66,17 @@ const getDesignTokens = (mode: ThemeMode) => ({
             dark: '#3F1DCB',
           },
           background: {
-            default: '#F5F7FA',
+            default: '#EEF2F7',
             paper: '#FFFFFF',
           },
           text: {
-            primary: '#0A1628',
-            secondary: 'rgba(10, 22, 40, 0.7)',
+            primary: '#1a2332',
+            secondary: '#5a6577',
           },
-          divider: 'rgba(10, 22, 40, 0.12)',
+          divider: 'rgba(0, 100, 115, 0.1)',
+          success: { main: '#22c55e' },
+          warning: { main: '#f59e0b' },
+          info: { main: '#3b82f6' },
         }),
   },
   typography: {
@@ -137,7 +140,8 @@ const getDesignTokens = (mode: ThemeMode) => ({
           borderRadius: 12,
           boxShadow: mode === 'dark'
             ? '0 4px 12px rgba(0, 0, 0, 0.3)'
-            : '0 4px 12px rgba(0, 0, 0, 0.08)',
+            : '0 2px 12px rgba(0, 100, 115, 0.06), 0 1px 3px rgba(0, 0, 0, 0.04)',
+          border: mode === 'dark' ? 'none' : '1px solid rgba(0, 100, 115, 0.08)',
         },
       },
     },
