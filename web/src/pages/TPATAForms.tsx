@@ -3,7 +3,7 @@ import {
   Box, Card, CardContent, Typography, Chip, Button, TextField,
   Grid2 as Grid, Drawer, IconButton, Divider, FormControl, InputLabel,
   Select, MenuItem, Switch, FormControlLabel, alpha, useTheme, Paper,
-  Checkbox, Radio, RadioGroup, Slider,
+  Checkbox, Radio, RadioGroup, Slider, Dialog, DialogTitle, DialogContent,
 } from '@mui/material';
 import {
   Close as CloseIcon,
@@ -481,6 +481,8 @@ export default function TPATAForms() {
   const [formValues, setFormValues] = useState<Record<string, unknown>>({});
   const [chatPrompt, setChatPrompt] = useState('');
   const [chatResponse, setChatResponse] = useState('');
+  const [pdfViewerOpen, setPdfViewerOpen] = useState(false);
+  const [pdfHtml, setPdfHtml] = useState('');
 
   const openForm = (form: TPATAForm) => {
     setSelectedForm(form);
@@ -490,6 +492,133 @@ export default function TPATAForms() {
 
   const updateField = useCallback((fieldId: string, value: unknown) => {
     setFormValues(prev => ({ ...prev, [fieldId]: value }));
+  }, []);
+
+  // Generate professional PDF-style HTML report
+  const generatePdfHtml = useCallback((form: TPATAForm, values: Record<string, unknown>): string => {
+    const grouped: Record<string, FormField[]> = {};
+    form.fields.forEach(f => {
+      const section = f.section || 'General Information';
+      if (!grouped[section]) grouped[section] = [];
+      grouped[section].push(f);
+    });
+
+    const passCount = form.fields.filter(f => values[f.id] === 'pass').length;
+    const failCount = form.fields.filter(f => values[f.id] === 'fail').length;
+    const totalAnswered = form.fields.filter(f => values[f.id] !== undefined && values[f.id] !== '').length;
+    const complianceRate = totalAnswered > 0 ? Math.round((passCount / (passCount + failCount || 1)) * 100) : 0;
+
+    const sectionHtml = Object.entries(grouped).map(([section, fields]) => `
+      <div class="section">
+        <div class="section-header">${section}</div>
+        <table class="field-table">
+          ${fields.map(f => {
+            let displayValue = '';
+            const val = values[f.id];
+            if (f.type === 'passfail') {
+              displayValue = val === 'pass' ? '<span class="badge pass">✓ PASS</span>' : val === 'fail' ? '<span class="badge fail">✗ FAIL</span>' : val === 'na' ? '<span class="badge na">N/A</span>' : '—';
+            } else if (f.type === 'yesno') {
+              displayValue = val === 'yes' ? 'Yes' : val === 'no' ? 'No' : val === 'na' ? 'N/A' : '—';
+            } else if (f.type === 'select') {
+              displayValue = String(val || '—');
+            } else if (f.type === 'slider') {
+              displayValue = val !== undefined ? `${val} / ${f.max}` : '—';
+            } else {
+              displayValue = val !== undefined ? String(val) : '—';
+            }
+            return `<tr><td class="field-label">${f.label}${f.required ? ' <span class="req">*</span>' : ''}</td><td class="field-value">${displayValue}</td></tr>`;
+          }).join('')}
+        </table>
+      </div>
+    `).join('');
+
+    const remarks = (values[form.fields.find(f => f.type === 'textarea')?.id || ''] as string) || '';
+    const inspector = (values[form.fields.find(f => f.label.toLowerCase().includes('signature') || f.label.toLowerCase().includes('auditor'))?.id || ''] as string) || '';
+
+    return `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>${form.code} — ${form.name}</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', -apple-system, sans-serif; color: #1a1a2e; background: #f0f2f5; padding: 40px; }
+  .report { max-width: 800px; margin: 0 auto; background: #fff; box-shadow: 0 2px 20px rgba(0,0,0,0.08); }
+  .header { background: linear-gradient(135deg, #0A4D8C 0%, #00A3A1 100%); color: #fff; padding: 32px 40px; }
+  .header-row { display: flex; justify-content: space-between; align-items: flex-start; }
+  .header h1 { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+  .header .subtitle { font-size: 13px; opacity: 0.85; }
+  .header .code { background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 4px; font-size: 13px; font-weight: 600; }
+  .meta-bar { display: flex; gap: 24px; padding: 16px 40px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; font-size: 13px; }
+  .meta-item { }
+  .meta-label { color: #64748b; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .meta-value { font-weight: 600; color: #1e293b; }
+  .summary-bar { display: flex; gap: 16px; padding: 20px 40px; background: #f1f5f9; border-bottom: 1px solid #e2e8f0; }
+  .summary-card { flex: 1; text-align: center; padding: 12px; background: #fff; border-radius: 8px; border: 1px solid #e2e8f0; }
+  .summary-number { font-size: 28px; font-weight: 700; }
+  .summary-label { font-size: 11px; color: #64748b; text-transform: uppercase; }
+  .summary-number.green { color: #16a34a; }
+  .summary-number.red { color: #dc2626; }
+  .summary-number.blue { color: #2563eb; }
+  .content { padding: 24px 40px; }
+  .section { margin-bottom: 24px; }
+  .section-header { font-size: 14px; font-weight: 700; color: #0A4D8C; padding: 8px 12px; background: #f0f7ff; border-left: 3px solid #0A4D8C; margin-bottom: 12px; }
+  .field-table { width: 100%; border-collapse: collapse; }
+  .field-table tr { border-bottom: 1px solid #f1f5f9; }
+  .field-table td { padding: 8px 12px; font-size: 13px; vertical-align: middle; }
+  .field-label { width: 55%; color: #475569; }
+  .field-value { width: 45%; font-weight: 500; }
+  .req { color: #dc2626; }
+  .badge { display: inline-block; padding: 2px 10px; border-radius: 4px; font-size: 12px; font-weight: 600; }
+  .badge.pass { background: #dcfce7; color: #16a34a; }
+  .badge.fail { background: #fee2e2; color: #dc2626; }
+  .badge.na { background: #f1f5f9; color: #64748b; }
+  .remarks-box { background: #fefce8; border: 1px solid #fde68a; border-radius: 8px; padding: 16px; margin: 16px 0; }
+  .remarks-title { font-size: 12px; font-weight: 700; color: #92400e; margin-bottom: 6px; }
+  .remarks-text { font-size: 13px; color: #78350f; line-height: 1.5; }
+  .signature-section { display: flex; justify-content: space-between; margin-top: 40px; padding-top: 24px; border-top: 2px solid #e2e8f0; }
+  .sig-block { width: 45%; }
+  .sig-line { border-bottom: 1px solid #94a3b8; height: 40px; margin-bottom: 4px; }
+  .sig-label { font-size: 11px; color: #64748b; text-transform: uppercase; }
+  .sig-name { font-size: 13px; font-weight: 600; }
+  .footer { padding: 16px 40px; background: #f8fafc; border-top: 1px solid #e2e8f0; text-align: center; font-size: 11px; color: #94a3b8; }
+  .watermark { position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%) rotate(-30deg); font-size: 80px; color: rgba(0,0,0,0.03); font-weight: 900; pointer-events: none; z-index: 0; }
+  @media print { body { padding: 0; background: #fff; } .report { box-shadow: none; } .watermark { display: none; } }
+</style></head>
+<body>
+<div class="report">
+  <div class="watermark">SpatialVerse</div>
+  <div class="header">
+    <div class="header-row">
+      <div>
+        <h1>${form.icon} ${form.name}</h1>
+        <div class="subtitle">SpatialVerse Pulse — TPATA Compliance Inspection Report</div>
+      </div>
+      <div class="code">${form.code}</div>
+    </div>
+  </div>
+  <div class="meta-bar">
+    <div class="meta-item"><div class="meta-label">Site</div><div class="meta-value">${(values[form.fields.find(f => f.label === 'Site Name')?.id || ''] as string) || '—'}</div></div>
+    <div class="meta-item"><div class="meta-label">Inspector</div><div class="meta-value">${inspector}</div></div>
+    <div class="meta-item"><div class="meta-label">Date</div><div class="meta-value">${(values[form.fields.find(f => f.label.toLowerCase().includes('inspection date') || f.label.toLowerCase().includes('audit date'))?.id || ''] as string) || '—'}</div></div>
+    <div class="meta-item"><div class="meta-label">Compliance Rate</div><div class="meta-value">${complianceRate}%</div></div>
+  </div>
+  <div class="summary-bar">
+    <div class="summary-card"><div class="summary-number green">${passCount}</div><div class="summary-label">Passed</div></div>
+    <div class="summary-card"><div class="summary-number red">${failCount}</div><div class="summary-label">Failed</div></div>
+    <div class="summary-card"><div class="summary-number blue">${totalAnswered}</div><div class="summary-label">Total Fields</div></div>
+    <div class="summary-card"><div class="summary-number" style="color: ${complianceRate >= 80 ? '#16a34a' : complianceRate >= 50 ? '#f59e0b' : '#dc2626'}">${complianceRate}%</div><div class="summary-label">Compliance</div></div>
+  </div>
+  <div class="content">
+    ${sectionHtml}
+    ${remarks ? `<div class="remarks-box"><div class="remarks-title">⚠️ Remarks / Defects Noted</div><div class="remarks-text">${remarks}</div></div>` : ''}
+    <div class="signature-section">
+      <div class="sig-block"><div class="sig-line"></div><div class="sig-label">Inspector</div><div class="sig-name">${inspector}</div></div>
+      <div class="sig-block"><div class="sig-line"></div><div class="sig-label">Reviewed By</div><div class="sig-name">FM Manager</div></div>
+    </div>
+  </div>
+  <div class="footer">
+    Generated by SpatialVerse Pulse • ${form.code} • ${new Date().toLocaleDateString('en-MY', { day: 'numeric', month: 'long', year: 'numeric' })} • Page 1 of 1
+  </div>
+</div>
+</body></html>`;
   }, []);
 
   // Group fields by section
@@ -695,17 +824,19 @@ export default function TPATAForms() {
                   <Chip size="small" label={selectedForm.code} color="primary" variant="outlined" sx={{ mt: 0.5 }} />
                 </Box>
                 <Box>
-                  <IconButton onClick={() => window.print()} title="Print"><PrintIcon /></IconButton>
                   <IconButton onClick={() => {
-                    // Build CSV from form fields + values
-                    const rows = selectedForm.fields.map(f => `"${f.label}","${formValues[f.id] ?? ''}"`).join('\n');
-                    const csv = `"Field","Value"\n${rows}`;
-                    const blob = new Blob([csv], { type: 'text/csv' });
+                    const html = generatePdfHtml(selectedForm, formValues);
+                    setPdfHtml(html);
+                    setPdfViewerOpen(true);
+                  }} title="View Report"><PrintIcon /></IconButton>
+                  <IconButton onClick={() => {
+                    const html = generatePdfHtml(selectedForm, formValues);
+                    const blob = new Blob([html], { type: 'text/html' });
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
-                    a.href = url; a.download = `${selectedForm.code}-export.csv`; a.click();
+                    a.href = url; a.download = `${selectedForm.code}-report.html`; a.click();
                     URL.revokeObjectURL(url);
-                  }} title="Export CSV"><DownloadIcon /></IconButton>
+                  }} title="Download Report"><DownloadIcon /></IconButton>
                   <IconButton onClick={() => setDrawerOpen(false)}><CloseIcon /></IconButton>
                 </Box>
               </Box>
@@ -742,11 +873,49 @@ export default function TPATAForms() {
                 }}>
                   Submit Inspection
                 </Button>
-                <Button variant="outlined" startIcon={<PrintIcon />} onClick={() => window.print()}>Print</Button>
+                <Button variant="outlined" startIcon={<PrintIcon />} onClick={() => {
+                  const html = generatePdfHtml(selectedForm, formValues);
+                  setPdfHtml(html);
+                  setPdfViewerOpen(true);
+                }}>View Report</Button>
               </Box>
             </Box>
           )}
         </Drawer>
+
+        {/* PDF Report Viewer */}
+        <Dialog
+          open={pdfViewerOpen}
+          onClose={() => setPdfViewerOpen(false)}
+          maxWidth="md"
+          fullWidth
+          PaperProps={{ sx: { height: '90vh', display: 'flex', flexDirection: 'column' } }}
+        >
+          <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 1.5 }}>
+            <Typography variant="h6" fontWeight={700}>Inspection Report</Typography>
+            <Box>
+              <IconButton onClick={() => {
+                const w = window.open('', '_blank');
+                if (w) { w.document.write(pdfHtml); w.document.close(); w.print(); }
+              }} title="Print"><PrintIcon /></IconButton>
+              <IconButton onClick={() => {
+                const blob = new Blob([pdfHtml], { type: 'text/html' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url; a.download = 'tpata-report.html'; a.click();
+                URL.revokeObjectURL(url);
+              }} title="Download"><DownloadIcon /></IconButton>
+              <IconButton onClick={() => setPdfViewerOpen(false)}><CloseIcon /></IconButton>
+            </Box>
+          </DialogTitle>
+          <DialogContent sx={{ flex: 1, p: 0, overflow: 'hidden' }}>
+            <iframe
+              srcDoc={pdfHtml}
+              style={{ width: '100%', height: '100%', border: 'none' }}
+              title="Report Preview"
+            />
+          </DialogContent>
+        </Dialog>
       </Box>
     </AnimatedPage>
   );
