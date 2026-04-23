@@ -246,6 +246,10 @@ interface AppState {
   generateWOFromPMSchedule: (pmSchedule: PMSchedule) => WorkOrder;
   markNotificationRead: (notificationId: string) => void;
   markAllNotificationsRead: () => void;
+  publishedApps: string[]; // app IDs published to dashboard
+  togglePublishedApp: (appId: string) => void;
+  dashboardLayout: string[]; // ordered app IDs for drag reorder
+  setDashboardLayout: (ids: string[]) => void;
 }
 
 const extractSequence = (number: string) => {
@@ -645,6 +649,14 @@ export const useStore = create<AppState>()(
       },
       assetHealthBandFilter: 'all',
       setAssetHealthBandFilter: (band) => set({ assetHealthBandFilter: band }),
+      publishedApps: ['app-1', 'app-3', 'app-7'],
+      togglePublishedApp: (appId) => set((state) => ({
+        publishedApps: state.publishedApps.includes(appId)
+          ? state.publishedApps.filter(id => id !== appId)
+          : [...state.publishedApps, appId],
+      })),
+      dashboardLayout: [] as string[],
+      setDashboardLayout: (ids) => set({ dashboardLayout: ids }),
       addUtilityBill: (input) => {
         if (input.amountRM <= 0 || input.units <= 0 || !input.billingPeriod.trim()) {
           return;

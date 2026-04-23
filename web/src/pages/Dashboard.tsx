@@ -33,6 +33,12 @@ import {
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, CartesianGrid, XAxis, YAxis } from 'recharts';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
+import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
+import ExtensionIcon from '@mui/icons-material/Extension';
+import BoltIcon from '@mui/icons-material/Bolt';
+import KpiIcon from '@mui/icons-material/Speed';
+import SensorIcon from '@mui/icons-material/Sensors';
+import ReportIcon from '@mui/icons-material/Assessment';
 import { useThemeContext } from '../theme/ThemeContext';
 import { useStore } from '../store/useStore';
 
@@ -228,6 +234,8 @@ export default function Dashboard() {
     notifications,
     generateWOFromPMSchedule,
     setAssetHealthBandFilter,
+    publishedApps,
+    dashboardLayout,
   } = useStore();
   const [snackbarMessage, setSnackbarMessage] = useState('');
 
@@ -782,6 +790,76 @@ export default function Dashboard() {
           </Grid>
         </Grid>
       </Grid>
+
+      {/* My Apps — Published from Pulse Studio */}
+      {publishedApps.length > 0 && (
+        <Box sx={{ mt: 3 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+            <ExtensionIcon sx={{ color: 'primary.main' }} />
+            <Typography variant="h6" fontWeight={700}>My Apps</Typography>
+            <Chip size="small" label={`${publishedApps.length} installed`} color="primary" variant="outlined" />
+          </Box>
+          <Grid container spacing={2}>
+            {(dashboardLayout.length > 0 ? dashboardLayout.filter(id => publishedApps.includes(id)) : publishedApps).map((appId: string, idx: number) => {
+              const appData: Record<string, { name: string; icon: React.ReactNode; desc: string; value: string; label: string; color: string }> = {
+                'app-1': { name: 'Chiller Efficiency Tracker', icon: <BoltIcon />, desc: 'Real-time COP monitoring', value: '2.8', label: 'Avg COP', color: '#16a34a' },
+                'app-2': { name: 'Vendor Scorecard', icon: <KpiIcon />, desc: 'Contractor performance', value: '92%', label: 'Score', color: '#2563eb' },
+                'app-3': { name: 'Daily Temp Log', icon: <SensorIcon />, desc: 'Cold water temperatures', value: '14.2°C', label: 'Last Reading', color: '#f59e0b' },
+                'app-6': { name: 'Water Dashboard', icon: <ReportIcon />, desc: 'SYABAS consumption', value: '847 m³', label: 'This Month', color: '#8b5cf6' },
+                'app-7': { name: 'SLA Breach Analyzer', icon: <ReportIcon />, desc: 'Breach pattern analysis', value: '6', label: 'Breaches MTD', color: '#dc2626' },
+              };
+              const app = appData[appId] || { name: `Custom App (${appId.slice(-4)})`, icon: <ExtensionIcon />, desc: 'AI-generated app', value: '—', label: 'Active', color: theme.palette.primary.main };
+              const [dragging, setDragging] = useState(false);
+              return (
+                <Grid size={{ xs: 12, sm: 6, md: 4 }} key={appId}>
+                  <Card sx={{
+                    border: `1px solid ${alpha(app.color, 0.2)}`,
+                    background: `linear-gradient(135deg, ${alpha(app.color, 0.06)} 0%, transparent 60%)`,
+                    opacity: dragging ? 0.5 : 1,
+                    cursor: 'default',
+                    transition: 'all 0.2s ease',
+                    '&:hover': { borderColor: alpha(app.color, 0.4) },
+                  }}
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData('text/plain', String(idx));
+                      setDragging(true);
+                    }}
+                    onDragEnd={() => setDragging(false)}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      const fromIdx = Number(e.dataTransfer.getData('text/plain'));
+                      if (fromIdx === idx) return;
+                      const newOrder = [...publishedApps];
+                      const [moved] = newOrder.splice(fromIdx, 1);
+                      newOrder.splice(idx, 0, moved);
+                      useStore.getState().setDashboardLayout(newOrder);
+                    }}
+                  >
+                    <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Avatar sx={{ bgcolor: alpha(app.color, 0.1), color: app.color, width: 36, height: 36 }}>{app.icon}</Avatar>
+                          <Box>
+                            <Typography variant="subtitle2" fontWeight={700}>{app.name}</Typography>
+                            <Typography variant="caption" color="text.secondary">{app.desc}</Typography>
+                          </Box>
+                        </Box>
+                        <DragIndicatorIcon sx={{ color: 'text.disabled', cursor: 'grab', '&:hover': { color: 'text.secondary' } }} />
+                      </Box>
+                      <Box sx={{ mt: 1.5, p: 1.5, bgcolor: alpha(app.color, 0.06), borderRadius: 1, textAlign: 'center' }}>
+                        <Typography variant="h5" fontWeight={800} sx={{ color: app.color }}>{app.value}</Typography>
+                        <Typography variant="caption" color="text.secondary">{app.label}</Typography>
+                      </Box>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              );
+            })}
+          </Grid>
+        </Box>
+      )}
 
       <Snackbar
         open={Boolean(snackbarMessage)}

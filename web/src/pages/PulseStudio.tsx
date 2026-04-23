@@ -23,9 +23,10 @@ import {
   Lock as LockIcon,
 } from '@mui/icons-material';
 import AnimatedPage, { AnimatedPanel } from '../components/AnimatedPage';
+import { useStore } from '../store/useStore';
 
 // ── Types ────────────────────────────────────────────────────────
-interface StudioApp {
+export interface StudioApp {
   id: string;
   name: string;
   description: string;
@@ -44,7 +45,7 @@ interface StudioApp {
 }
 
 // ── Pre-built / AI-generated apps ────────────────────────────────
-const STUDIO_APPS: StudioApp[] = [
+export const STUDIO_APPS_DATA: StudioApp[] = [
   {
     id: 'app-1',
     name: 'Chiller Plant Efficiency Tracker',
@@ -176,10 +177,12 @@ const SUGGESTED_APPS = [
 
 export default function PulseStudio() {
   const theme = useTheme();
-  const [apps, setApps] = useState<StudioApp[]>(STUDIO_APPS);
+  const { publishedApps, togglePublishedApp } = useStore();
+  const [apps, setApps] = useState<StudioApp[]>(STUDIO_APPS_DATA);
   const [prompt, setPrompt] = useState('');
   const [generating, setGenerating] = useState(false);
   const [generatedPreview, setGeneratedPreview] = useState<string | null>(null);
+  const [previewWidget, setPreviewWidget] = useState(false);
   const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
   const [menuAppId, setMenuAppId] = useState<string | null>(null);
   const [snackbar, setSnackbar] = useState('');
@@ -187,16 +190,19 @@ export default function PulseStudio() {
 
   const installedCount = apps.filter(a => a.installed).length;
   const starredCount = apps.filter(a => a.starred).length;
+  const publishedCount = publishedApps.length;
 
   const handleGenerate = () => {
     if (!prompt.trim()) return;
     setGenerating(true);
     setGeneratedPreview(null);
+    setPreviewWidget(false);
 
     // Simulate AI generation
     setTimeout(() => {
       setGenerating(false);
-      setGeneratedPreview(`✅ App generated successfully!\n\nBased on your request:\n"${prompt}"\n\nI've created a new app with:\n• Data source: ${apps[0].dataSources[0]}\n• 3 dashboard widgets\n• 1 input form\n• Alert notifications on thresholds\n\nClick "Install App" to add it to your workspace.`);
+      setPreviewWidget(true);
+      setGeneratedPreview(prompt);
     }, 2000);
   };
 
@@ -218,8 +224,11 @@ export default function PulseStudio() {
         default: return a;
       }
     }));
+    if (action === 'publish' && menuAppId) {
+      togglePublishedApp(menuAppId);
+    }
     const actionLabels: Record<string, string> = {
-      publish: 'Published to dashboard',
+      publish: 'Toggled dashboard visibility',
       share: 'Shared with organization',
       star: 'Updated favorite',
       install: 'App installed',
@@ -290,17 +299,57 @@ export default function PulseStudio() {
                 ))}
               </Box>
 
-              {/* Generation result */}
-              {generatedPreview && (
-                <Paper sx={{ p: 2, bgcolor: alpha(theme.palette.success.main, 0.06), border: `1px solid ${alpha(theme.palette.success.main, 0.2)}`, borderRadius: 1 }}>
-                  <Typography variant="body2" sx={{ whiteSpace: 'pre-line', mb: 1.5 }}>{generatedPreview}</Typography>
-                  <Box sx={{ display: 'flex', gap: 1 }}>
+              {/* Generation result with widget preview */}
+              {previewWidget && generatedPreview && (
+                <Paper sx={{ p: 0, overflow: 'hidden', border: `1px solid ${alpha(theme.palette.success.main, 0.2)}`, borderRadius: 2 }}>
+                  <Box sx={{ p: 1.5, bgcolor: alpha(theme.palette.success.main, 0.06), borderBottom: `1px solid ${alpha(theme.palette.success.main, 0.15)}` }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                      <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: '#22c55e' }} />
+                      <Typography variant="subtitle2" fontWeight={700}>App Generated Successfully</Typography>
+                    </Box>
+                    <Typography variant="caption" color="text.secondary">{generatedPreview}</Typography>
+                  </Box>
+                  {/* Widget preview */}
+                  <Box sx={{ p: 2, bgcolor: alpha(theme.palette.background.default, 0.5) }}>
+                    <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block', textTransform: 'uppercase', letterSpacing: 1 }}>Widget Preview</Typography>
+                    <Grid container spacing={1.5}>
+                      <Grid size={{ xs: 4 }}>
+                        <Box sx={{ p: 1.5, bgcolor: 'background.paper', borderRadius: 1, border: `1px solid ${theme.palette.divider}`, textAlign: 'center' }}>
+                          <Typography variant="h5" fontWeight={700} color="primary">24</Typography>
+                          <Typography variant="caption" color="text.secondary">Records</Typography>
+                        </Box>
+                      </Grid>
+                      <Grid size={{ xs: 4 }}>
+                        <Box sx={{ p: 1.5, bgcolor: 'background.paper', borderRadius: 1, border: `1px solid ${theme.palette.divider}`, textAlign: 'center' }}>
+                          <Typography variant="h5" fontWeight={700} color="success">98%</Typography>
+                          <Typography variant="caption" color="text.secondary">Compliance</Typography>
+                        </Box>
+                      </Grid>
+                      <Grid size={{ xs: 4 }}>
+                        <Box sx={{ p: 1.5, bgcolor: 'background.paper', borderRadius: 1, border: `1px solid ${theme.palette.divider}`, textAlign: 'center' }}>
+                          <Typography variant="h5" fontWeight={700} color="warning">3</Typography>
+                          <Typography variant="caption" color="text.secondary">Alerts</Typography>
+                        </Box>
+                      </Grid>
+                    </Grid>
+                    <Box sx={{ mt: 1.5, p: 1.5, bgcolor: 'background.paper', borderRadius: 1, border: `1px solid ${theme.palette.divider}` }}>
+                      <Typography variant="caption" fontWeight={600} sx={{ display: 'block', mb: 0.5 }}>Data Sources</Typography>
+                      <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+                        {['Assets', 'Sensors', 'Work Orders'].map(ds => (
+                          <Chip key={ds} size="small" label={ds} variant="outlined" sx={{ height: 20, fontSize: '0.65rem' }} />
+                        ))}
+                      </Box>
+                    </Box>
+                  </Box>
+                  <Box sx={{ p: 1.5, display: 'flex', gap: 1, borderTop: `1px solid ${alpha(theme.palette.divider, 0.5)}` }}>
                     <Button size="small" variant="contained" startIcon={<AddIcon />} onClick={() => {
-                      setSnackbar('App installed to your workspace');
+                      togglePublishedApp('app-new-' + Date.now());
+                      setSnackbar('App installed and published to Dashboard');
+                      setPreviewWidget(false);
                       setGeneratedPreview(null);
                       setPrompt('');
-                    }}>Install App</Button>
-                    <Button size="small" variant="outlined" onClick={() => { setGeneratedPreview(null); setPrompt(''); }}>Discard</Button>
+                    }}>Install to Dashboard</Button>
+                    <Button size="small" variant="outlined" onClick={() => { setPreviewWidget(false); setGeneratedPreview(null); setPrompt(''); }}>Discard</Button>
                   </Box>
                 </Paper>
               )}
@@ -363,7 +412,7 @@ export default function PulseStudio() {
 
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <Box sx={{ display: 'flex', gap: 0.5 }}>
-                        {app.published && <Tooltip title="Published to Dashboard"><DashboardIcon sx={{ fontSize: 14, color: '#22c55e' }} /></Tooltip>}
+                        {publishedApps.includes(app.id) && <Tooltip title="Published to Dashboard"><DashboardIcon sx={{ fontSize: 14, color: '#22c55e' }} /></Tooltip>}
                         {app.shared && <Tooltip title="Shared with Org"><PublicIcon sx={{ fontSize: 14, color: '#3b82f6' }} /></Tooltip>}
                         {!app.shared && <Tooltip title="Private"><LockIcon sx={{ fontSize: 14, color: 'text.disabled' }} /></Tooltip>}
                       </Box>
