@@ -34,6 +34,7 @@ import {
   EventAvailable as ReservationIcon,
   Speed as KpiIcon,
   ShoppingCart as ShoppingCartIcon,
+  Description as TPATAIcon,
   ExpandMore,
   ChevronRight,
 } from '@mui/icons-material';
@@ -76,6 +77,7 @@ const existingRoutePaths = new Set([
   '/kpi-dashboard',
   '/pm-schedules',
   '/procurement',
+  '/tpata-forms',
   '/contractors',
   '/inventory',
   '/reports',
@@ -131,6 +133,7 @@ const menuSections: MenuSectionConfig[] = [
       { text: 'DLP Tracker', icon: <DlpIcon />, path: '/dlp-tracker', roles: ['fm_manager', 'supervisor'] },
       { text: 'Inventory', icon: <InventoryIcon />, path: '/inventory', roles: ['fm_manager'] },
       { text: 'Procurement', icon: <ShoppingCartIcon />, path: '/procurement', roles: ['fm_manager'] },
+      { text: 'TPATA Forms', icon: <TPATAIcon />, path: '/tpata-forms', roles: ['fm_manager', 'supervisor'] },
     ],
   },
   {

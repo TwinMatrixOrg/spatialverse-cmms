@@ -20,6 +20,7 @@ import DrawingManagement from './pages/DrawingManagement';
 import SpaceReservation from './pages/SpaceReservation';
 import KPIDashboard from './pages/KPIDashboard';
 import Procurement from './pages/Procurement';
+import TPATAForms from './pages/TPATAForms';
 
 function App() {
   const { loggedIn } = useAuth();
@@ -47,6 +48,7 @@ function App() {
         <Route path="space-reservations" element={<SpaceReservation />} />
         <Route path="kpi-dashboard" element={<KPIDashboard />} />
         <Route path="procurement" element={<Procurement />} />
+        <Route path="tpata-forms" element={<TPATAForms />} />
         <Route path="*" element={<Navigate to={loggedIn ? '/' : '/login'} replace />} />
       </Route>
 
