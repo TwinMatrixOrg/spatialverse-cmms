@@ -807,6 +807,21 @@ export default function WorkOrders() {
         }}
       >
         {selectedWO && (
+          <>
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', p: 1, borderBottom: '1px solid', borderColor: 'divider' }}>
+            <Button
+              size="small"
+              variant="outlined"
+              onClick={() => {
+                const w = selectedWO;
+                const html = `<!DOCTYPE html><html><head><title>WO ${w.number}</title><style>body{font-family:Arial,sans-serif;max-width:800px;margin:40px auto;color:#222}h1{font-size:20px;border-bottom:2px solid #0A4D8C;padding-bottom:8px}.header{margin-bottom:20px}.field{display:flex;gap:8px;margin-bottom:6px}.label{font-weight:bold;min-width:140px;color:#555}table{width:100%;border-collapse:collapse;margin:12px 0}th,td{border:1px solid #ddd;padding:8px;text-align:left}th{background:#f5f5f5}.sig{margin-top:40px;display:flex;gap:60px}.sig div{border-top:1px solid #333;padding-top:4px;width:200px;text-align:center;font-size:12px;color:#777}@media print{button{display:none}}</style></head><body><div class="header"><h1>Work Order: ${w.number}</h1><p>${w.title}</p></div><div class="field"><span class="label">Status:</span><span>${w.status}</span></div><div class="field"><span class="label">Priority:</span><span>${w.priority}</span></div><div class="field"><span class="label">Assigned To:</span><span>${w.assignedToId || '-'}</span></div><div class="field"><span class="label">Created:</span><span>${w.createdAt}</span></div><div class="field"><span class="label">Description:</span><span>${w.description || '-'}</span></div>${w.checklist && w.checklist.length > 0 ? '<h3>Checklist</h3><table><tr><th>Item</th><th>Done</th></tr>' + w.checklist.map(c => `<tr><td>${c.text}</td><td>${c.completed ? '✅' : '⬜'}</td></tr>`).join('') + '</table>' : ''}${w.comments && w.comments.length > 0 ? '<h3>Comments</h3>' + w.comments.map(c => `<p><strong>${c.userId}:</strong> ${c.message}</p>`).join('') : ''}<div class="sig"><div>Technician Signature</div><div>Supervisor Signature</div><div>Date</div></div><button onclick="window.print()" style="margin-top:20px;padding:8px 16px;cursor:pointer">Print / Save as PDF</button></body></html>`;
+                const w2 = window.open('', '_blank');
+                if (w2) { w2.document.write(html); w2.document.close(); }
+              }}
+            >
+              Print WO
+            </Button>
+          </Box>
           <WODetailPanel
             wo={selectedWO}
             permit={permits.find((permit) => permit.workOrderId === selectedWO.id) || null}
@@ -846,6 +861,7 @@ export default function WorkOrders() {
               saveRCA(selectedWO.id, rootCause, failureMode, correctiveAction)
             }
           />
+          </>
         )}
       </Drawer>
 

@@ -783,6 +783,18 @@ function AssetDetailPanel({
             </Grid>
             <Grid size={{ xs: 6 }}>
               <Typography variant="caption" color="text.secondary">
+                SKATA Code
+              </Typography>
+              <Typography variant="body2" sx={{ fontFamily: 'monospace', fontWeight: 600 }}>{asset.skataCode || '-'}</Typography>
+            </Grid>
+            <Grid size={{ xs: 6 }}>
+              <Typography variant="caption" color="text.secondary">
+                PeDATA Label
+              </Typography>
+              <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>{asset.peDataLabel || '-'}</Typography>
+            </Grid>
+            <Grid size={{ xs: 6 }}>
+              <Typography variant="caption" color="text.secondary">
                 Install Date
               </Typography>
               <Typography variant="body2">

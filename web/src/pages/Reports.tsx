@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   Box,
   Typography,
@@ -6,6 +6,7 @@ import {
   CardContent,
   Grid2 as Grid,
   TextField,
+  Button,
   useTheme,
   Tabs,
   Tab,
@@ -18,6 +19,7 @@ import {
   Paper,
   Chip,
 } from '@mui/material';
+import { Download as DownloadIcon } from '@mui/icons-material';
 import {
   LineChart,
   Line,
@@ -135,6 +137,29 @@ export default function Reports() {
   rangeStart.setHours(0, 0, 0, 0);
   const rangeEnd = new Date(endDate);
   rangeEnd.setHours(23, 59, 59, 999);
+
+  const handleExportCSV = useCallback(() => {
+    const filtered = workOrders.filter((wo) => isWithinRange(wo.createdAt));
+    const headers = ['WO Number', 'Title', 'Status', 'Priority', 'Assigned To', 'Created', 'Resolved', 'Total Cost (RM)'];
+    const rows = filtered.map((wo) => [
+      wo.number,
+      `"${wo.title}"`,
+      wo.status,
+      wo.priority,
+      wo.assignedToId || '-',
+      wo.createdAt ? format(new Date(wo.createdAt), 'yyyy-MM-dd') : '-',
+      wo.resolvedAt ? format(new Date(wo.resolvedAt), 'yyyy-MM-dd') : '-',
+      (wo.totalCost || 0).toFixed(2),
+    ]);
+    const csv = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `pulse-report-${format(new Date(), 'yyyy-MM-dd')}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [workOrders, startDate, endDate]);
 
   const isWithinRange = (dateString: string) => {
     const entryDate = new Date(dateString);
@@ -361,6 +386,9 @@ export default function Reports() {
                 inputLabel: { shrink: true },
               }}
             />
+            <Button variant="outlined" startIcon={<DownloadIcon />} onClick={handleExportCSV} size="small">
+              Export CSV
+            </Button>
           </Box>
         </Box>
 

@@ -95,6 +95,7 @@ export interface Site {
   address: string;
   location: { lat: number; lng: number };
   timezone: string;
+  skataCode?: string;
 }
 
 export interface User {
@@ -149,6 +150,8 @@ export interface Asset {
   warrantyExpiry?: string;
   healthScore: number;
   healthStatus: AssetHealthStatus;
+  skataCode?: string;
+  peDataLabel?: string;
   lastServiceDate?: string;
   openWorkOrdersCount: number;
   failureHistory?: AssetFailureEvent[];
@@ -405,6 +408,7 @@ export const sites: Site[] = [
     address: '168 Jalan Bukit Bintang, 55100 Kuala Lumpur',
     location: { lat: 3.1488, lng: 101.7131 },
     timezone: 'Asia/Kuala_Lumpur',
+    skataCode: 'JKR-PKL-001',
   },
   {
     id: 'site-2',
@@ -412,6 +416,7 @@ export const sites: Site[] = [
     address: '3 Jalan PJS 11/15, Bandar Sunway, 47500 Subang Jaya',
     location: { lat: 3.0733, lng: 101.6078 },
     timezone: 'Asia/Kuala_Lumpur',
+    skataCode: 'JKR-SPR-002',
   },
   {
     id: 'site-3',
@@ -419,6 +424,7 @@ export const sites: Site[] = [
     address: 'Mid Valley City, 58000 Kuala Lumpur',
     location: { lat: 3.1178, lng: 101.6773 },
     timezone: 'Asia/Kuala_Lumpur',
+    skataCode: 'JKR-MVA-003',
   },
 ];
 
@@ -503,6 +509,8 @@ const checklistTemplatesByType: Record<string, string[]> = {
   'IT/AV': ['Check network connectivity', 'Inspect cable terminations', 'Validate device firmware', 'Run system diagnostics', 'Capture incident notes'],
   Structural: ['Inspect visible cracks', 'Check anchor points', 'Assess corrosion areas', 'Verify load-bearing condition', 'Photograph and log findings'],
   Other: ['Visual inspection', 'Functional check', 'Safety verification', 'Rectification action', 'Complete service notes'],
+  'Waste Collection': ['Collect general waste bags', 'Sort recyclables into correct bins', 'Check bin condition and lids', 'Log waste volume by category', 'Dispose hazardous waste if needed'],
+  'Cleaning': ['Inspect floor condition', 'Check restroom supplies and fixtures', 'Wipe surfaces and fixtures', 'Mop or vacuum floors', 'Verify waste bins emptied and replaced'],
 };
 
 const defaultCommentTemplates = [
@@ -970,11 +978,19 @@ export const assets: Asset[] = baseAssets.map((asset) => {
     };
   }, {});
 
+  const typePrefix: Record<string, string> = {
+    HVAC: 'HVAC', Electrical: 'ELV', Plumbing: 'PLB', 'Fire Safety': 'FAS', Elevator: 'ELV', Structural: 'STR', 'IT/AV': 'ITV', General: 'GEN',
+  };
+  const prefix = typePrefix[asset.type] || 'GEN';
+  const seq = asset.id.split('-')[1] || '001';
+
   return {
     ...asset,
     sensors: sensorsWithLatestValues,
     sensorHistory,
     sensorStatus: calculateSensorStatus(sensorsWithLatestValues),
+    skataCode: `${prefix}-${String(seq).padStart(3, '0')}-${asset.siteId === 'site-1' ? 'PKL' : asset.siteId === 'site-2' ? 'SPR' : 'MVA'}-${asset.floor?.replace('L', '') || '0'}`,
+    peDataLabel: `PE-2026-${String(seq).padStart(4, '0')}`,
   };
 });
 

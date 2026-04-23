@@ -144,6 +144,20 @@ const checklistTemplates: Record<string, string[]> = {
     'Lubricate moving parts',
     'Log condition',
   ],
+  'Waste Collection': [
+    'Collect general waste bags',
+    'Sort recyclables into correct bins',
+    'Check bin condition and lids',
+    'Log waste volume by category',
+    'Dispose hazardous waste if needed',
+  ],
+  'Cleaning': [
+    'Inspect floor condition',
+    'Check restroom supplies and fixtures',
+    'Wipe surfaces and fixtures',
+    'Mop or vacuum floors',
+    'Verify waste bins emptied and replaced',
+  ],
 };
 
 const getDueStatus = (pmSchedule: PMSchedule) => {
