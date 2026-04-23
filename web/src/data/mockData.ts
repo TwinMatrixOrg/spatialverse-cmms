@@ -276,6 +276,93 @@ export interface AppNotification {
   severity: 'critical' | 'warning' | 'info';
 }
 
+// ── Procurement ──────────────────────────────────────────────────
+export type POStatus = 'draft' | 'pending_approval' | 'approved' | 'ordered' | 'received' | 'completed' | 'cancelled';
+export type PRStatus = 'draft' | 'pending_approval' | 'approved' | 'rejected' | 'converted';
+export type GRNStatus = 'pending' | 'received' | 'partial' | 'rejected';
+
+export interface POLineItem {
+  id: string;
+  itemName: string;
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  totalPrice: number;
+  unitOfMeasure: string;
+  inventoryItemId?: string;
+  receivedQuantity?: number;
+}
+
+export interface PurchaseRequisition {
+  id: string;
+  number: string;
+  siteId: string;
+  requestedById: string;
+  requestedByName: string;
+  workOrderId?: string;
+  workOrderNumber?: string;
+  description: string;
+  items: POLineItem[];
+  totalAmount: number;
+  currency: string;
+  status: PRStatus;
+  justification?: string;
+  createdAt: string;
+  updatedAt: string;
+  approvedAt?: string;
+  approvedById?: string;
+  approvedByName?: string;
+  convertedToPO?: string;
+}
+
+export interface PurchaseOrder {
+  id: string;
+  number: string;
+  siteId: string;
+  prId?: string;
+  prNumber?: string;
+  workOrderId?: string;
+  workOrderNumber?: string;
+  vendorId: string;
+  vendorName: string;
+  requestedById: string;
+  requestedByName: string;
+  description: string;
+  items: POLineItem[];
+  subtotal: number;
+  tax: number;
+  totalAmount: number;
+  currency: string;
+  status: POStatus;
+  paymentTerms?: string;
+  deliveryDate?: string;
+  deliveryAddress?: string;
+  createdAt: string;
+  updatedAt: string;
+  approvedAt?: string;
+  approvedById?: string;
+  approvedByName?: string;
+  grnId?: string;
+}
+
+export interface GRNLineItem extends POLineItem {
+  receivedQuantity: number;
+  condition: 'good' | 'damaged' | 'incorrect';
+}
+
+export interface GoodsReceiptNote {
+  id: string;
+  number: string;
+  poId: string;
+  poNumber: string;
+  receivedById: string;
+  receivedByName: string;
+  items: GRNLineItem[];
+  status: GRNStatus;
+  notes?: string;
+  createdAt: string;
+}
+
 export interface PermitSafetyChecklistItem {
   id: string;
   phase: PermitChecklistPhase;
@@ -2220,3 +2307,216 @@ export const getWorkOrdersByStatusCount = (
     closed: filteredWOs.filter(wo => wo.status === 'closed').length,
   };
 };
+
+// ── Procurement Seed Data ────────────────────────────────────────
+export const purchaseRequisitions: PurchaseRequisition[] = [
+  {
+    id: 'pr-1',
+    number: 'PR-2026-001',
+    siteId: 'site-1',
+    requestedById: 'u-2',
+    requestedByName: 'Farid Azlan',
+    workOrderId: 'wo-1',
+    workOrderNumber: 'WO-2026-001',
+    description: 'HVAC filter replacement — Pavilion KL Block A AHUs',
+    items: [
+      { id: 'pri-1', itemName: 'MERV-13 Pleated Filter 24×24×4', description: 'AHU filter pack', quantity: 40, unitPrice: 85, totalPrice: 3400, unitOfMeasure: 'pcs' },
+      { id: 'pri-2', itemName: 'Pre-Filter Roll 24"', description: 'Pre-filter media', quantity: 10, unitPrice: 120, totalPrice: 1200, unitOfMeasure: 'roll' },
+    ],
+    totalAmount: 4600,
+    currency: 'MYR',
+    status: 'approved',
+    justification: 'Filters 18+ months old. PM schedule overdue. Compressor at 92% load.',
+    createdAt: '2026-03-15T09:00:00Z',
+    updatedAt: '2026-03-18T14:30:00Z',
+    approvedAt: '2026-03-18T14:30:00Z',
+    approvedById: 'u-3',
+    approvedByName: 'James Lee',
+    convertedToPO: 'po-1',
+  },
+  {
+    id: 'pr-2',
+    number: 'PR-2026-002',
+    siteId: 'site-1',
+    requestedById: 'u-4',
+    requestedByName: 'Aminah Bte Hassan',
+    description: 'Electrical MCB replacement — Level 12 switchboard',
+    items: [
+      { id: 'pri-3', itemName: 'MCB 3P 63A Type C', description: 'ABB S203M', quantity: 6, unitPrice: 285, totalPrice: 1710, unitOfMeasure: 'pcs' },
+      { id: 'pri-4', itemName: 'Surge Protector 3P+N', description: 'ABB OVR T2', quantity: 2, unitPrice: 950, totalPrice: 1900, unitOfMeasure: 'pcs' },
+      { id: 'pri-5', itemName: 'Cable Lug 95mm²', description: 'Copper cable lug', quantity: 20, unitPrice: 12, totalPrice: 240, unitOfMeasure: 'pcs' },
+    ],
+    totalAmount: 3850,
+    currency: 'MYR',
+    status: 'pending_approval',
+    justification: 'Faulty MCBs causing intermittent trip on L12. WO-2026-003 linked.',
+    createdAt: '2026-04-02T08:15:00Z',
+    updatedAt: '2026-04-02T08:15:00Z',
+  },
+  {
+    id: 'pr-3',
+    number: 'PR-2026-003',
+    siteId: 'site-2',
+    requestedById: 'u-5',
+    requestedByName: 'Tan Wei Lin',
+    description: 'Plumbing valves — KLCC East Wing booster pump',
+    items: [
+      { id: 'pri-6', itemName: 'Butterfly Valve DN150', description: 'Pneumatic actuator', quantity: 2, unitPrice: 2400, totalPrice: 4800, unitOfMeasure: 'pcs' },
+      { id: 'pri-7', itemName: 'Pressure Gauge 0-16 bar', description: 'Digital pressure gauge', quantity: 4, unitPrice: 350, totalPrice: 1400, unitOfMeasure: 'pcs' },
+    ],
+    totalAmount: 6200,
+    currency: 'MYR',
+    status: 'draft',
+    justification: 'Booster pump inspection found worn valves. Must replace before rainy season.',
+    createdAt: '2026-04-10T11:00:00Z',
+    updatedAt: '2026-04-10T11:00:00Z',
+  },
+];
+
+export const purchaseOrders: PurchaseOrder[] = [
+  {
+    id: 'po-1',
+    number: 'PO-2026-001',
+    siteId: 'site-1',
+    prId: 'pr-1',
+    prNumber: 'PR-2026-001',
+    workOrderId: 'wo-1',
+    workOrderNumber: 'WO-2026-001',
+    vendorId: 'v-1',
+    vendorName: 'Konsortium HVAC Sdn Bhd',
+    requestedById: 'u-2',
+    requestedByName: 'Farid Azlan',
+    description: 'HVAC filter replacement — Block A AHUs',
+    items: [
+      { id: 'poi-1', itemName: 'MERV-13 Pleated Filter 24×24×4', description: 'AHU filter pack', quantity: 40, unitPrice: 85, totalPrice: 3400, unitOfMeasure: 'pcs' },
+      { id: 'poi-2', itemName: 'Pre-Filter Roll 24"', description: 'Pre-filter media', quantity: 10, unitPrice: 120, totalPrice: 1200, unitOfMeasure: 'roll' },
+    ],
+    subtotal: 4600,
+    tax: 276,
+    totalAmount: 4876,
+    currency: 'MYR',
+    status: 'received',
+    paymentTerms: 'Net 30',
+    deliveryDate: '2026-04-01',
+    deliveryAddress: 'Pavilion KL, Block A, Loading Dock',
+    createdAt: '2026-03-19T10:00:00Z',
+    updatedAt: '2026-04-01T09:00:00Z',
+    approvedAt: '2026-03-19T16:00:00Z',
+    approvedById: 'u-3',
+    approvedByName: 'James Lee',
+    grnId: 'grn-1',
+  },
+  {
+    id: 'po-2',
+    number: 'PO-2026-002',
+    siteId: 'site-1',
+    prId: 'pr-2',
+    prNumber: 'PR-2026-002',
+    workOrderId: 'wo-3',
+    workOrderNumber: 'WO-2026-003',
+    vendorId: 'v-2',
+    vendorName: 'ProTech Electrical Services',
+    requestedById: 'u-4',
+    requestedByName: 'Aminah Bte Hassan',
+    description: 'MCB replacement — Level 12 switchboard',
+    items: [
+      { id: 'poi-3', itemName: 'MCB 3P 63A Type C', description: 'ABB S203M', quantity: 6, unitPrice: 285, totalPrice: 1710, unitOfMeasure: 'pcs' },
+      { id: 'poi-4', itemName: 'Surge Protector 3P+N', description: 'ABB OVR T2', quantity: 2, unitPrice: 950, totalPrice: 1900, unitOfMeasure: 'pcs' },
+      { id: 'poi-5', itemName: 'Cable Lug 95mm²', description: 'Copper cable lug', quantity: 20, unitPrice: 12, totalPrice: 240, unitOfMeasure: 'pcs' },
+    ],
+    subtotal: 3850,
+    tax: 231,
+    totalAmount: 4081,
+    currency: 'MYR',
+    status: 'ordered',
+    paymentTerms: 'Net 45',
+    deliveryDate: '2026-04-20',
+    deliveryAddress: 'Pavilion KL, Main Entrance',
+    createdAt: '2026-04-05T14:00:00Z',
+    updatedAt: '2026-04-05T16:00:00Z',
+    approvedAt: '2026-04-05T16:00:00Z',
+    approvedById: 'u-3',
+    approvedByName: 'James Lee',
+  },
+  {
+    id: 'po-3',
+    number: 'PO-2026-003',
+    siteId: 'site-2',
+    vendorId: 'v-3',
+    vendorName: 'MegaBuild Sdn Bhd',
+    requestedById: 'u-5',
+    requestedByName: 'Tan Wei Lin',
+    description: 'Booster pump valve replacement — KLCC East Wing',
+    items: [
+      { id: 'poi-6', itemName: 'Butterfly Valve DN150', description: 'Pneumatic actuator', quantity: 2, unitPrice: 2400, totalPrice: 4800, unitOfMeasure: 'pcs' },
+      { id: 'poi-7', itemName: 'Pressure Gauge 0-16 bar', description: 'Digital pressure gauge', quantity: 4, unitPrice: 350, totalPrice: 1400, unitOfMeasure: 'pcs' },
+    ],
+    subtotal: 6200,
+    tax: 372,
+    totalAmount: 6572,
+    currency: 'MYR',
+    status: 'draft',
+    paymentTerms: 'Net 30',
+    createdAt: '2026-04-11T09:30:00Z',
+    updatedAt: '2026-04-11T09:30:00Z',
+  },
+  {
+    id: 'po-4',
+    number: 'PO-2026-004',
+    siteId: 'site-1',
+    workOrderId: 'wo-5',
+    workOrderNumber: 'WO-2026-005',
+    vendorId: 'v-1',
+    vendorName: 'Konsortium HVAC Sdn Bhd',
+    requestedById: 'u-2',
+    requestedByName: 'Farid Azlan',
+    description: 'Emergency refrigerant top-up — Block B chillers',
+    items: [
+      { id: 'poi-8', itemName: 'R410A Refrigerant', description: 'DuPont ISCEON MO99 equivalent', quantity: 4, unitPrice: 3200, totalPrice: 12800, unitOfMeasure: 'canister' },
+    ],
+    subtotal: 12800,
+    tax: 768,
+    totalAmount: 13568,
+    currency: 'MYR',
+    status: 'completed',
+    paymentTerms: 'Net 15',
+    deliveryDate: '2026-03-28',
+    deliveryAddress: 'Pavilion KL, Block B, Plant Room',
+    createdAt: '2026-03-25T11:00:00Z',
+    updatedAt: '2026-03-28T16:00:00Z',
+    approvedAt: '2026-03-25T14:00:00Z',
+    approvedById: 'u-3',
+    approvedByName: 'James Lee',
+  },
+];
+
+export const goodsReceiptNotes: GoodsReceiptNote[] = [
+  {
+    id: 'grn-1',
+    number: 'GRN-2026-001',
+    poId: 'po-1',
+    poNumber: 'PO-2026-001',
+    receivedById: 'u-2',
+    receivedByName: 'Farid Azlan',
+    items: [
+      { id: 'grn-1-i-1', itemName: 'MERV-13 Pleated Filter 24×24×4', description: 'AHU filter pack', quantity: 40, unitPrice: 85, totalPrice: 3400, unitOfMeasure: 'pcs', receivedQuantity: 40, condition: 'good' },
+      { id: 'grn-1-i-2', itemName: 'Pre-Filter Roll 24"', description: 'Pre-filter media', quantity: 10, unitPrice: 120, totalPrice: 1200, unitOfMeasure: 'roll', receivedQuantity: 8, condition: 'good' },
+    ],
+    status: 'partial',
+    notes: '2 pre-filter rolls backordered — vendor promises delivery by Apr 5.',
+    createdAt: '2026-04-01T09:00:00Z',
+  },
+  {
+    id: 'grn-2',
+    number: 'GRN-2026-002',
+    poId: 'po-4',
+    poNumber: 'PO-2026-004',
+    receivedById: 'u-2',
+    receivedByName: 'Farid Azlan',
+    items: [
+      { id: 'grn-2-i-1', itemName: 'R410A Refrigerant', description: 'DuPont ISCEON MO99 equivalent', quantity: 4, unitPrice: 3200, totalPrice: 12800, unitOfMeasure: 'canister', receivedQuantity: 4, condition: 'good' },
+    ],
+    status: 'received',
+    createdAt: '2026-03-28T15:30:00Z',
+  },
+];

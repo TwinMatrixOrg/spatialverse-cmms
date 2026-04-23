@@ -33,6 +33,7 @@ import {
   Description as DrawingIcon,
   EventAvailable as ReservationIcon,
   Speed as KpiIcon,
+  ShoppingCart as ShoppingCartIcon,
   ExpandMore,
   ChevronRight,
 } from '@mui/icons-material';
@@ -74,6 +75,7 @@ const existingRoutePaths = new Set([
   '/space-reservations',
   '/kpi-dashboard',
   '/pm-schedules',
+  '/procurement',
   '/contractors',
   '/inventory',
   '/reports',
@@ -128,6 +130,7 @@ const menuSections: MenuSectionConfig[] = [
       { text: 'Utility Management', icon: <UtilityIcon />, path: '/utility-management', roles: ['fm_manager', 'supervisor'] },
       { text: 'DLP Tracker', icon: <DlpIcon />, path: '/dlp-tracker', roles: ['fm_manager', 'supervisor'] },
       { text: 'Inventory', icon: <InventoryIcon />, path: '/inventory', roles: ['fm_manager'] },
+      { text: 'Procurement', icon: <ShoppingCartIcon />, path: '/procurement', roles: ['fm_manager'] },
     ],
   },
   {

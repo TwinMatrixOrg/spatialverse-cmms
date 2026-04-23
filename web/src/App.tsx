@@ -19,6 +19,7 @@ import DLPTracker from './pages/DLPTracker';
 import DrawingManagement from './pages/DrawingManagement';
 import SpaceReservation from './pages/SpaceReservation';
 import KPIDashboard from './pages/KPIDashboard';
+import Procurement from './pages/Procurement';
 
 function App() {
   const { loggedIn } = useAuth();
@@ -45,6 +46,7 @@ function App() {
         <Route path="drawing-management" element={<DrawingManagement />} />
         <Route path="space-reservations" element={<SpaceReservation />} />
         <Route path="kpi-dashboard" element={<KPIDashboard />} />
+        <Route path="procurement" element={<Procurement />} />
         <Route path="*" element={<Navigate to={loggedIn ? '/' : '/login'} replace />} />
       </Route>
 
