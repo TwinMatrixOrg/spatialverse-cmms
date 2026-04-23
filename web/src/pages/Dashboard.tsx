@@ -34,11 +34,13 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, Carte
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
+import UnfoldMoreIcon from '@mui/icons-material/UnfoldMore';
 import ExtensionIcon from '@mui/icons-material/Extension';
 import BoltIcon from '@mui/icons-material/Bolt';
 import KpiIcon from '@mui/icons-material/Speed';
 import SensorIcon from '@mui/icons-material/Sensors';
 import ReportIcon from '@mui/icons-material/Assessment';
+import type { ReactNode } from 'react';
 import { useThemeContext } from '../theme/ThemeContext';
 import { useStore } from '../store/useStore';
 
@@ -221,6 +223,40 @@ function SLABadge({ deadline, status }: { deadline: string; status: string }) {
   );
 }
 
+const DASHBOARD_SECTIONS = ['kpis', 'chart-map', 'health-wo', 'pm-alerts', 'my-apps'] as const;
+
+type SectionData = Record<string, { label: string; render: ReactNode }>;
+
+function DashboardSection({ id, children, isOver, onDrag }: { id: string; children: ReactNode; isOver: boolean; onDrag: (from: string, to: string) => void }) {
+  return (
+    <Box
+      draggable
+      onDragStart={(e) => { e.dataTransfer.setData('text/plain', id); e.dataTransfer.effectAllowed = 'move'; }}
+      onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }}
+      onDrop={(e) => { e.preventDefault(); const from = e.dataTransfer.getData('text/plain'); if (from && from !== id) onDrag(from, id); }}
+      sx={{
+        position: 'relative',
+        borderRadius: 2,
+        outline: isOver ? '2.5px dashed rgba(0,163,161,0.6)' : '2.5px dashed transparent',
+        outlineOffset: 6,
+        transition: 'outline 0.15s ease',
+        mb: 2,
+        '&:hover .dh': { opacity: 1 },
+      }}
+    >
+      <Box className="dh" sx={{
+        position: 'absolute', top: 4, right: 4, zIndex: 5,
+        opacity: 0, transition: 'opacity 0.2s', cursor: 'grab',
+        bgcolor: 'background.paper', borderRadius: 1, p: 0.5, boxShadow: 2,
+        '&:active': { cursor: 'grabbing' },
+      }}>
+        <UnfoldMoreIcon sx={{ fontSize: 20, color: 'text.secondary', transform: 'rotate(90deg)' }} />
+      </Box>
+      {children}
+    </Box>
+  );
+}
+
 export default function Dashboard() {
   const theme = useTheme();
   const { mode: themeMode } = useThemeContext();
@@ -234,10 +270,26 @@ export default function Dashboard() {
     notifications,
     generateWOFromPMSchedule,
     setAssetHealthBandFilter,
-    publishedApps,
     dashboardLayout,
   } = useStore();
   const [snackbarMessage, setSnackbarMessage] = useState('');
+  const [sectionOrder, setSectionOrder] = useState<string[]>(() => {
+    try { const s = JSON.parse(localStorage.getItem('pulse-dash-order') || '[]'); return s.length ? s : [...DASHBOARD_SECTIONS]; } catch { return [...DASHBOARD_SECTIONS]; }
+  });
+  const [dragOver, setDragOver] = useState<string | null>(null);
+  const { publishedApps } = useStore();
+
+  const handleSectionDrop = (from: string, to: string) => {
+    const newOrder = [...sectionOrder];
+    const fi = newOrder.indexOf(from);
+    const ti = newOrder.indexOf(to);
+    if (fi < 0 || ti < 0) return;
+    newOrder.splice(fi, 1);
+    newOrder.splice(ti, 0, from);
+    setSectionOrder(newOrder);
+    localStorage.setItem('pulse-dash-order', JSON.stringify(newOrder));
+    setDragOver(null);
+  };
 
   const kpis = getDashboardKPIs(selectedSiteId || undefined, workOrders, assets, pmSchedules);
   const woByStatus = getWorkOrdersByStatusCount(selectedSiteId || undefined, workOrders);
@@ -455,7 +507,11 @@ export default function Dashboard() {
         </Alert>
       ))}
 
-      {/* KPI Cards */}
+      {sectionOrder.map((sectionId) => {
+        const over = dragOver === sectionId;
+
+        if (sectionId === 'kpis') return (
+          <DashboardSection key="kpis" id="kpis" isOver={over} onDrag={handleSectionDrop}>
       <Box
         sx={{
           display: 'grid',
@@ -481,7 +537,11 @@ export default function Dashboard() {
           </Box>
         ))}
       </Box>
+          </DashboardSection>
+        );
 
+        if (sectionId === 'chart-map') return (
+          <DashboardSection key="chart-map" id="chart-map" isOver={over} onDrag={handleSectionDrop}>
       <Grid container spacing={{ xs: 2, md: 3 }}>
         {/* WO Status Chart */}
         <Grid size={{ xs: 12, md: 4 }}>
@@ -550,7 +610,13 @@ export default function Dashboard() {
             </CardContent>
           </Card>
         </Grid>
+      </Grid>
+          </DashboardSection>
+        );
 
+        if (sectionId === 'health-wo') return (
+          <DashboardSection key="health-wo" id="health-wo" isOver={over} onDrag={handleSectionDrop}>
+      <Grid container spacing={{ xs: 2, md: 3 }}>
         <Grid size={{ xs: 12, md: 6 }}>
           <Card sx={{ height: 320 }}>
             <CardContent sx={{ p: 2.5 }}>
@@ -658,7 +724,13 @@ export default function Dashboard() {
           </Card>
         </Grid>
 
-        {/* Upcoming PM & Alerts */}
+      </Grid>
+          </DashboardSection>
+        );
+
+        if (sectionId === 'pm-alerts') return (
+          <DashboardSection key="pm-alerts" id="pm-alerts" isOver={over} onDrag={handleSectionDrop}>
+      <Grid container spacing={{ xs: 2, md: 3 }}>
         <Grid size={{ xs: 12, md: 6 }}>
           <Grid container spacing={3} sx={{ height: '100%' }}>
             {/* Upcoming PM */}
@@ -790,16 +862,18 @@ export default function Dashboard() {
           </Grid>
         </Grid>
       </Grid>
+          </DashboardSection>
+        );
 
-      {/* My Apps — Published from Pulse Studio */}
-      {publishedApps.length > 0 && (
-        <Box sx={{ mt: 3 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-            <ExtensionIcon sx={{ color: 'primary.main' }} />
-            <Typography variant="h6" fontWeight={700}>My Apps</Typography>
-            <Chip size="small" label={`${publishedApps.length} installed`} color="primary" variant="outlined" />
-          </Box>
-          <Grid container spacing={2}>
+        if (sectionId === 'my-apps' && publishedApps.length > 0) return (
+          <DashboardSection key="my-apps" id="my-apps" isOver={over} onDrag={handleSectionDrop}>
+      <Box>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2, pl: 0.5 }}>
+          <ExtensionIcon sx={{ color: 'primary.main' }} />
+          <Typography variant="h6" fontWeight={700}>My Apps</Typography>
+          <Chip size="small" label={`${publishedApps.length} installed`} color="primary" variant="outlined" />
+        </Box>
+        <Grid container spacing={2}>
             {(dashboardLayout.length > 0 ? dashboardLayout.filter(id => publishedApps.includes(id)) : publishedApps).map((appId: string, idx: number) => {
               const appData: Record<string, { name: string; icon: React.ReactNode; desc: string; value: string; label: string; color: string }> = {
                 'app-1': { name: 'Chiller Efficiency Tracker', icon: <BoltIcon />, desc: 'Real-time COP monitoring', value: '2.8', label: 'Avg COP', color: '#16a34a' },
@@ -858,8 +932,12 @@ export default function Dashboard() {
               );
             })}
           </Grid>
-        </Box>
-      )}
+      </Box>
+          </DashboardSection>
+        );
+
+        return null;
+      })}
 
       <Snackbar
         open={Boolean(snackbarMessage)}
