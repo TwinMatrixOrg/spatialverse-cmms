@@ -255,6 +255,7 @@ export default function ChatBot() {
             display: 'flex',
             flexDirection: 'column',
             border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
+            bgcolor: 'background.paper',
           }}
         >
           {/* Header */}
@@ -277,7 +278,7 @@ export default function ChatBot() {
           </Box>
 
           {/* Messages */}
-          <Box sx={{ flex: 1, overflow: 'auto', p: 1.5, display: 'flex', flexDirection: 'column', gap: 1 }}>
+          <Box sx={{ flex: 1, overflow: 'auto', p: 1.5, display: 'flex', flexDirection: 'column', gap: 1, bgcolor: alpha(theme.palette.mode === 'dark' ? '#0f172a' : '#f8fafc', 0.5) }}>
             {messages.map(msg => (
               <Box key={msg.id} sx={{
                 alignSelf: msg.sender === 'user' ? 'flex-end' : 'flex-start',
@@ -285,10 +286,11 @@ export default function ChatBot() {
               }}>
                 <Box sx={{
                   p: 1.5, borderRadius: 2,
-                  bgcolor: msg.sender === 'user' ? 'primary.main' : alpha(theme.palette.grey[100], 1),
-                  color: msg.sender === 'user' ? '#fff' : 'text.primary',
+                  bgcolor: msg.sender === 'user' ? 'primary.main' : alpha(theme.palette.mode === 'dark' ? '#1e293b' : '#f1f5f9', 1),
+                  color: msg.sender === 'user' ? '#fff' : (theme.palette.mode === 'dark' ? '#e2e8f0' : 'text.primary'),
                   borderBottomRightRadius: msg.sender === 'user' ? 4 : 16,
                   borderBottomLeftRadius: msg.sender === 'user' ? 16 : 4,
+                  border: msg.sender === 'user' ? 'none' : `1px solid ${alpha(theme.palette.mode === 'dark' ? '#334155' : '#e2e8f0', 0.5)}`,
                 }}>
                   <Typography variant="body2" sx={{ whiteSpace: 'pre-line', lineHeight: 1.5 }}>
                     {msg.text}
@@ -309,13 +311,19 @@ export default function ChatBot() {
                 variant="outlined"
                 clickable
                 onClick={() => handleQuickQuestion(q)}
-                sx={{ fontSize: '0.7rem', height: 26, maxWidth: '100%' }}
+                sx={{
+                  fontSize: '0.7rem', height: 26, maxWidth: '100%',
+                  bgcolor: alpha(theme.palette.mode === 'dark' ? '#1e293b' : '#fff', 0.8),
+                  borderColor: alpha(theme.palette.mode === 'dark' ? '#475569' : '#cbd5e1', 0.5),
+                  color: theme.palette.mode === 'dark' ? '#cbd5e1' : 'text.primary',
+                  '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.1) },
+                }}
               />
             ))}
           </Box>
 
           {/* Input */}
-          <Box sx={{ p: 1.5, pt: 0.5, borderTop: `1px solid ${alpha(theme.palette.divider, 0.5)}`, display: 'flex', gap: 1 }}>
+          <Box sx={{ p: 1.5, pt: 0.5, borderTop: `1px solid ${alpha(theme.palette.mode === 'dark' ? '#334155' : theme.palette.divider, 0.5)}`, display: 'flex', gap: 1, bgcolor: 'background.paper' }}>
             <TextField
               size="small"
               fullWidth
@@ -323,7 +331,11 @@ export default function ChatBot() {
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handleSend()}
-              sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
+              sx={{
+                '& .MuiOutlinedInput-root': { borderRadius: 3 },
+                '& .MuiInputBase-input': { color: 'text.primary' },
+                '& .MuiInputBase-input::placeholder': { color: alpha(theme.palette.text.secondary, 0.7), opacity: 1 },
+              }}
             />
             <IconButton onClick={handleSend} color="primary" sx={{ flexShrink: 0 }}>
               <SendIcon />
