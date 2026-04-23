@@ -21,6 +21,7 @@ import SpaceReservation from './pages/SpaceReservation';
 import KPIDashboard from './pages/KPIDashboard';
 import Procurement from './pages/Procurement';
 import TPATAForms from './pages/TPATAForms';
+import APDDashboard from './pages/APDDashboard';
 
 function App() {
   const { loggedIn } = useAuth();
@@ -49,6 +50,7 @@ function App() {
         <Route path="kpi-dashboard" element={<KPIDashboard />} />
         <Route path="procurement" element={<Procurement />} />
         <Route path="tpata-forms" element={<TPATAForms />} />
+        <Route path="apd-dashboard" element={<APDDashboard />} />
         <Route path="*" element={<Navigate to={loggedIn ? '/' : '/login'} replace />} />
       </Route>
 

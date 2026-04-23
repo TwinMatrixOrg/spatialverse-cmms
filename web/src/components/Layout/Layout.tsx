@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { Box, useMediaQuery, useTheme } from '@mui/material';
-import { AnimatePresence, motion } from 'framer-motion';
 import Sidebar from './Sidebar';
 import TopBar from './TopBar';
 import { useStore } from '../../store/useStore';
@@ -68,18 +67,19 @@ export default function Layout() {
             overflowX: 'hidden',
           }}
         >
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={location.pathname}
-              initial={{ opacity: 0, y: 14 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.35 }}
-              style={{ width: '100%' }}
-            >
-              <Outlet />
-            </motion.div>
-          </AnimatePresence>
+          <Box
+            key={location.pathname}
+            sx={{
+              '@keyframes pageSlideIn': {
+                from: { opacity: 0, transform: 'translateY(12px)' },
+                to: { opacity: 1, transform: 'translateY(0)' },
+              },
+              animation: 'pageSlideIn 0.3s ease-out',
+              width: '100%',
+            }}
+          >
+            <Outlet />
+          </Box>
         </Box>
       </Box>
     </Box>

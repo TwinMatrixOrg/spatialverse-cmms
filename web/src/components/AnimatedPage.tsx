@@ -1,37 +1,28 @@
 import { type ReactNode } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { Box } from '@mui/material';
 
-interface AnimatedPageProps {
+interface AnimatedPanelProps {
   children: ReactNode;
-  pageKey?: string;
+  delay?: number;
 }
 
-export default function AnimatedPage({ children, pageKey }: AnimatedPageProps) {
-  return (
-    <AnimatePresence mode="wait">
-      <motion.div
-        key={pageKey}
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -8 }}
-        transition={{ duration: 0.35 }}
-        style={{ width: '100%' }}
-      >
-        {children}
-      </motion.div>
-    </AnimatePresence>
-  );
+export default function AnimatedPage({ children }: { children: ReactNode }) {
+  return <>{children}</>;
 }
 
-export function AnimatedPanel({ children, delay = 0 }: { children: ReactNode; delay?: number }) {
+export function AnimatedPanel({ children, delay = 0 }: AnimatedPanelProps) {
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3, delay: delay * 0.08 }}
-      style={{ width: '100%' }}
+    <Box
+      sx={{
+        '@keyframes panelFadeIn': {
+          from: { opacity: 0, transform: 'translateY(8px)' },
+          to: { opacity: 1, transform: 'translateY(0)' },
+        },
+        animation: `panelFadeIn 0.35s ease-out ${delay * 0.07}s both`,
+        width: '100%',
+      }}
     >
       {children}
-    </motion.div>
+    </Box>
   );
 }

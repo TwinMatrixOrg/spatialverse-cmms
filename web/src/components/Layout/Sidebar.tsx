@@ -35,6 +35,7 @@ import {
   Speed as KpiIcon,
   ShoppingCart as ShoppingCartIcon,
   Description as TPATAIcon,
+  BarChart as APDIcon,
   ExpandMore,
   ChevronRight,
 } from '@mui/icons-material';
@@ -78,6 +79,7 @@ const existingRoutePaths = new Set([
   '/pm-schedules',
   '/procurement',
   '/tpata-forms',
+  '/apd-dashboard',
   '/contractors',
   '/inventory',
   '/reports',
@@ -131,17 +133,24 @@ const menuSections: MenuSectionConfig[] = [
       { text: 'PM Schedules', icon: <PMIcon />, path: '/pm-schedules', roles: ['fm_manager', 'supervisor'] },
       { text: 'Utility Management', icon: <UtilityIcon />, path: '/utility-management', roles: ['fm_manager', 'supervisor'] },
       { text: 'DLP Tracker', icon: <DlpIcon />, path: '/dlp-tracker', roles: ['fm_manager', 'supervisor'] },
-      { text: 'Inventory', icon: <InventoryIcon />, path: '/inventory', roles: ['fm_manager'] },
       { text: 'Procurement', icon: <ShoppingCartIcon />, path: '/procurement', roles: ['fm_manager'] },
-      { text: 'TPATA Forms', icon: <TPATAIcon />, path: '/tpata-forms', roles: ['fm_manager', 'supervisor'] },
     ],
   },
   {
     id: 'people',
-    label: '👥 People',
+    label: '👥 People & Inventory',
     items: [
       { text: 'Contractors', icon: <ContractorIcon />, path: '/contractors', roles: ['fm_manager'] },
+      { text: 'Inventory', icon: <InventoryIcon />, path: '/inventory', roles: ['fm_manager'] },
       { text: 'Space Reservations', icon: <ReservationIcon />, path: '/space-reservations', roles: ['fm_manager', 'supervisor', 'space_manager'] },
+    ],
+  },
+  {
+    id: 'compliance',
+    label: '📋 JKR Compliance',
+    items: [
+      { text: 'TPATA Forms', icon: <TPATAIcon />, path: '/tpata-forms', roles: ['fm_manager', 'supervisor'] },
+      { text: 'APD Dashboard', icon: <APDIcon />, path: '/apd-dashboard', roles: ['fm_manager'] },
     ],
   },
   {
