@@ -3,7 +3,11 @@ import {
   Box, Card, CardContent, Typography, Chip, Button, TextField,
   Grid2 as Grid, IconButton, Divider, alpha, useTheme, Paper,
   Avatar, Menu, MenuItem, Snackbar, Alert, Tooltip, Badge,
+  Modal, Dialog, DialogTitle, DialogContent, DialogActions, Rating,
 } from '@mui/material';
+import CloseIcon from '@mui/icons-material/Close';
+import ThumbUpIcon from '@mui/icons-material/ThumbUp';
+import PersonIcon from '@mui/icons-material/Person';
 import {
   SmartToy as AIIcon,
   Add as AddIcon,
@@ -187,6 +191,7 @@ export default function PulseStudio() {
   const [menuAppId, setMenuAppId] = useState<string | null>(null);
   const [snackbar, setSnackbar] = useState('');
   const [filter, setFilter] = useState<'all' | 'installed' | 'starred'>('all');
+  const [detailAppId, setDetailAppId] = useState<string | null>(null);
 
   const installedCount = apps.filter(a => a.installed).length;
   const starredCount = apps.filter(a => a.starred).length;
@@ -383,7 +388,7 @@ export default function PulseStudio() {
                           {app.icon}
                         </Avatar>
                         <Box>
-                          <Typography variant="subtitle2" fontWeight={700} sx={{ lineHeight: 1.2 }}>{app.name}</Typography>
+                          <Typography variant="subtitle2" fontWeight={700} sx={{ lineHeight: 1.2, cursor: 'pointer', '&:hover': { color: 'primary.main' } }} onClick={() => setDetailAppId(app.id)}>{app.name}</Typography>
                           <Box sx={{ display: 'flex', gap: 0.5, mt: 0.3 }}>
                             {app.generatedBy === 'ai' && <Chip size="small" label="AI" sx={{ height: 16, fontSize: '0.6rem', bgcolor: alpha('#8b5cf6', 0.15), color: '#7c3aed' }} />}
                             {app.installed && <Chip size="small" label="Installed" sx={{ height: 16, fontSize: '0.6rem', bgcolor: alpha('#22c55e', 0.15), color: '#16a34a' }} />}
@@ -453,6 +458,133 @@ export default function PulseStudio() {
         <Snackbar open={Boolean(snackbar)} autoHideDuration={3000} onClose={() => setSnackbar('')} anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}>
           <Alert onClose={() => setSnackbar('')} severity="success" variant="filled">{snackbar}</Alert>
         </Snackbar>
+
+        {/* App Detail Modal */}
+        {detailAppId && (() => {
+          const app = apps.find(a => a.id === detailAppId);
+          if (!app) return null;
+
+          const comments = [
+            { user: 'Ahmad Razak', role: 'Facilities Manager', avatar: 'AR', rating: 5, date: 'Apr 18, 2026', text: 'This app saved us hours of manual tracking. The real-time alerts are a game-changer — we caught a chiller malfunction before it went critical.' },
+            { user: 'Siti Nurhaliza', role: 'HVAC Technician', avatar: 'SN', rating: 4, date: 'Apr 15, 2026', text: 'Easy to use on the go. I check it daily during rounds. Would love to see offline mode added for when we\'re in the plant room basement with no signal.' },
+            { user: 'Brian Tan', role: 'Building Engineer', avatar: 'BT', rating: 5, date: 'Apr 12, 2026', text: 'The COP trend chart is exactly what management needed. Now we have hard data to justify the chiller replacement budget.' },
+            { user: 'Fatimah Ismail', role: 'Operations Director', avatar: 'FI', rating: 4, date: 'Apr 8, 2026', text: 'Finally some visibility into our energy efficiency. The dashboard widget is clean and the data matches our BMS readings.' },
+          ];
+
+          const screenshots = [
+            { label: 'Main Dashboard', colors: [theme.palette.primary.main, alpha(theme.palette.primary.main, 0.3)], icon: '📊' },
+            { label: 'Trend Analysis', colors: ['#22c55e', alpha('#22c55e', 0.3)], icon: '📈' },
+            { label: 'Alert Configuration', colors: ['#f59e0b', alpha('#f59e0b', 0.3)], icon: '🔔' },
+          ];
+
+          return (
+            <Dialog
+              open={true}
+              onClose={() => setDetailAppId(null)}
+              maxWidth="md"
+              fullWidth
+              PaperProps={{ sx: { borderRadius: 3 } }}
+            >
+              <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pb: 1 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                  <Avatar sx={{ bgcolor: alpha(theme.palette.primary.main, 0.1), color: 'primary.main', width: 44, height: 44, fontSize: 22 }}>{app.icon}</Avatar>
+                  <Box>
+                    <Typography variant="h6" fontWeight={700}>{app.name}</Typography>
+                    <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
+                      {app.generatedBy === 'ai' && <Chip size="small" label="AI Generated" sx={{ height: 18, fontSize: '0.6rem', bgcolor: alpha('#8b5cf6', 0.15), color: '#7c3aed' }} />}
+                      {app.generatedBy === 'builtin' && <Chip size="small" label="Built-in" sx={{ height: 18, fontSize: '0.6rem', bgcolor: alpha('#3b82f6', 0.15), color: '#2563eb' }} />}
+                      <Typography variant="caption" color="text.secondary">{app.usageCount} uses</Typography>
+                    </Box>
+                  </Box>
+                </Box>
+                <IconButton onClick={() => setDetailAppId(null)}><CloseIcon /></IconButton>
+              </DialogTitle>
+
+              <DialogContent dividers sx={{ p: 0 }}>
+                <Box sx={{ p: 3 }}>
+                  {/* Description */}
+                  <Typography variant="subtitle2" fontWeight={700} gutterBottom>About</Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 3, lineHeight: 1.7 }}>{app.description}</Typography>
+
+                  {/* Screenshots */}
+                  <Typography variant="subtitle2" fontWeight={700} gutterBottom>Screenshots</Typography>
+                  <Grid container spacing={1.5} sx={{ mb: 3 }}>
+                    {screenshots.map((ss, i) => (
+                      <Grid size={{ xs: 4 }} key={i}>
+                        <Box sx={{
+                          aspectRatio: '16/10',
+                          borderRadius: 2,
+                          background: `linear-gradient(135deg, ${ss.colors[0]} 0%, ${ss.colors[1]} 100%)`,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                          transition: 'transform 0.2s',
+                          '&:hover': { transform: 'scale(1.03)' },
+                          border: `1px solid ${alpha(theme.palette.divider, 0.5)}`,
+                        }}>
+                          <Typography sx={{ fontSize: 28, mb: 0.5 }}>{ss.icon}</Typography>
+                          <Typography variant="caption" sx={{ color: 'white', fontWeight: 600, textShadow: '0 1px 3px rgba(0,0,0,0.3)' }}>{ss.label}</Typography>
+                        </Box>
+                      </Grid>
+                    ))}
+                  </Grid>
+
+                  {/* Data Sources */}
+                  <Typography variant="subtitle2" fontWeight={700} gutterBottom>Data Sources</Typography>
+                  <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mb: 3 }}>
+                    {app.dataSources.map(ds => (
+                      <Chip key={ds} size="small" label={ds} variant="outlined" sx={{ height: 24, fontSize: '0.7rem' }} />
+                    ))}
+                  </Box>
+
+                  <Divider sx={{ my: 2 }} />
+
+                  {/* Comments */}
+                  <Typography variant="subtitle2" fontWeight={700} gutterBottom>Team Feedback</Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                    <Rating value={4.5} precision={0.5} readOnly size="small" />
+                    <Typography variant="caption" color="text.secondary">4.5 avg · {comments.length} reviews</Typography>
+                  </Box>
+                  {comments.map((c, i) => (
+                    <Box key={i} sx={{ mb: 2, pb: 2, borderBottom: i < comments.length - 1 ? `1px solid ${theme.palette.divider}` : 'none' }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                        <Avatar sx={{ width: 28, height: 28, fontSize: '0.7rem', bgcolor: alpha(theme.palette.primary.main, 0.15), color: 'primary.main' }}>{c.avatar}</Avatar>
+                        <Box sx={{ flex: 1 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            <Typography variant="body2" fontWeight={600}>{c.user}</Typography>
+                            <Chip size="small" label={c.role} sx={{ height: 16, fontSize: '0.6rem', bgcolor: alpha(theme.palette.info.main, 0.1), color: theme.palette.info.main }} />
+                          </Box>
+                          <Typography variant="caption" color="text.secondary">{c.date}</Typography>
+                        </Box>
+                        <Rating value={c.rating} readOnly size="small" sx={{ '& .MuiRating-icon': { fontSize: '0.9rem' } }} />
+                      </Box>
+                      <Typography variant="body2" color="text.secondary" sx={{ pl: 4.5, lineHeight: 1.6 }}>{c.text}</Typography>
+                    </Box>
+                  ))}
+                </Box>
+              </DialogContent>
+
+              <DialogActions sx={{ px: 3, py: 2 }}>
+                <Button variant="outlined" onClick={() => setDetailAppId(null)}>Close</Button>
+                {!app.installed ? (
+                  <Button variant="contained" startIcon={<AddIcon />} onClick={() => {
+                    setApps(prev => prev.map(a => a.id === app.id ? { ...a, installed: true } : a));
+                    setDetailAppId(null);
+                    setSnackbar(`${app.name} installed`);
+                  }}>Install App</Button>
+                ) : (
+                  <Button variant="contained" startIcon={<DashboardIcon />} onClick={() => {
+                    togglePublishedApp(app.id);
+                    setDetailAppId(null);
+                    setSnackbar(publishedApps.includes(app.id) ? 'Removed from Dashboard' : 'Published to Dashboard');
+                  }}>{publishedApps.includes(app.id) ? 'Remove from Dashboard' : 'Publish to Dashboard'}</Button>
+                )}
+              </DialogActions>
+            </Dialog>
+          );
+        })()}
       </Box>
     </AnimatedPage>
   );
