@@ -36,6 +36,7 @@ import {
   ShoppingCart as ShoppingCartIcon,
   Description as TPATAIcon,
   BarChart as APDIcon,
+  Extension as StudioIcon,
   ExpandMore,
   ChevronRight,
 } from '@mui/icons-material';
@@ -80,6 +81,7 @@ const existingRoutePaths = new Set([
   '/procurement',
   '/tpata-forms',
   '/apd-dashboard',
+  '/pulse-studio',
   '/contractors',
   '/inventory',
   '/reports',
@@ -159,6 +161,7 @@ const menuSections: MenuSectionConfig[] = [
     items: [
       { text: 'Reports', icon: <ReportIcon />, path: '/reports', roles: ['fm_manager', 'supervisor'] },
       { text: 'KPI Dashboard', icon: <KpiIcon />, path: '/kpi-dashboard', roles: ['fm_manager', 'supervisor'] },
+      { text: 'Pulse Studio', icon: <StudioIcon />, path: '/pulse-studio', roles: ['fm_manager', 'supervisor'] },
       { text: 'Settings', icon: <SettingsIcon />, path: '/settings', roles: ['fm_manager'] },
     ],
   },
