@@ -471,10 +471,69 @@ export default function PulseStudio() {
             { user: 'Fatimah Ismail', role: 'Operations Director', avatar: 'FI', rating: 4, date: 'Apr 8, 2026', text: 'Finally some visibility into our energy efficiency. The dashboard widget is clean and the data matches our BMS readings.' },
           ];
 
+          const barHeights = [60, 45, 70, 55, 80, 65, 50, 75, 60, 40, 85, 70];
+          const WidgetPreviewDashboard = () => (
+            <Box sx={{ width: '100%', height: '100%', bgcolor: '#0f172a', borderRadius: 1, overflow: 'hidden', p: 0.75 }}>
+              <Box sx={{ display: 'flex', gap: 0.5, mb: 0.5 }}>
+                {[12, 47, 98].map((v, ci) => (
+                  <Box key={ci} sx={{ flex: 1, height: 28, bgcolor: alpha('#0A4D8C', 0.2), borderRadius: 0.5, border: '1px solid rgba(10,77,140,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Typography sx={{ fontSize: 8, color: '#e2e8f0', fontWeight: 700 }}>{v}</Typography>
+                  </Box>
+                ))}
+              </Box>
+              <Box sx={{ display: 'flex', gap: 0.5, flex: 1 }}>
+                <Box sx={{ flex: 1.5, bgcolor: 'rgba(10,77,140,0.15)', borderRadius: 0.5, border: '1px solid rgba(10,77,140,0.3)', p: 0.5, display: 'flex', alignItems: 'flex-end', gap: 1 }}>
+                  {barHeights.map((h, j) => (
+                    <Box key={j} sx={{ flex: 1, height: `${h}%`, bgcolor: j === 10 ? '#00A3A1' : 'rgba(10,77,140,0.6)', borderRadius: '2px 2px 0 0' }} />
+                  ))}
+                </Box>
+                <Box sx={{ flex: 1, bgcolor: 'rgba(10,77,140,0.15)', borderRadius: 0.5, border: '1px solid rgba(10,77,140,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Box sx={{ width: 50, height: 50, borderRadius: '50%', border: '6px solid rgba(10,77,140,0.4)', borderTopColor: '#00A3A1', borderRightColor: '#00A3A1' }} />
+                </Box>
+              </Box>
+            </Box>
+          );
+
+          const WidgetPreviewTrend = () => (
+            <Box sx={{ width: '100%', height: '100%', bgcolor: '#0f172a', borderRadius: 1, overflow: 'hidden', p: 0.75 }}>
+              <Typography sx={{ fontSize: 7, color: '#94a3b8', mb: 0.5 }}>COP Trend — Last 12 Months</Typography>
+              <Box sx={{ height: '70%', position: 'relative', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                <svg width="100%" height="100%" viewBox="0 0 200 80" preserveAspectRatio="none">
+                  <polyline fill={alpha('#22c55e', 0.1)} stroke="none" points="0,60 20,55 40,50 60,45 80,48 100,35 120,30 140,25 160,28 180,20 200,15 200,80 0,80" />
+                  <polyline fill="none" stroke="#22c55e" strokeWidth="2" points="0,60 20,55 40,50 60,45 80,48 100,35 120,30 140,25 160,28 180,20 200,15" />
+                  <polyline fill="none" stroke="#f59e0b" strokeWidth="1.5" strokeDasharray="4 2" points="0,40 200,40" />
+                </svg>
+                <Box sx={{ position: 'absolute', right: 8, bottom: 12, bgcolor: alpha('#22c55e', 0.15), px: 0.5, borderRadius: 0.5 }}>
+                  <Typography sx={{ fontSize: 8, color: '#22c55e', fontWeight: 700 }}>2.84 COP</Typography>
+                </Box>
+              </Box>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.3 }}>
+                {['Jan', 'Apr', 'Jul', 'Oct', 'Jan'].map(m => (
+                  <Typography key={m} sx={{ fontSize: 5, color: '#64748b' }}>{m}</Typography>
+                ))}
+              </Box>
+            </Box>
+          );
+
+          const WidgetPreviewAlerts = () => (
+            <Box sx={{ width: '100%', height: '100%', bgcolor: '#0f172a', borderRadius: 1, overflow: 'hidden', p: 0.75 }}>
+              <Typography sx={{ fontSize: 7, color: '#94a3b8', mb: 0.5 }}>Alert Rules</Typography>
+              {[{ l: 'COP < 2.5', c: '#ef4444', on: true }, { l: 'Temp > 8°C', c: '#f59e0b', on: true }, { l: 'Flow < 0.8 m³/h', c: '#f59e0b', on: false }, { l: 'Vibration > 4mm/s', c: '#22c55e', on: false }].map((r, ri) => (
+                <Box key={ri} sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.4, px: 0.5, py: 0.3, bgcolor: alpha(r.c, 0.08), borderRadius: 0.5, border: `1px solid ${alpha(r.c, 0.2)}` }}>
+                  <Box sx={{ width: 5, height: 5, borderRadius: '50%', bgcolor: r.on ? r.c : '#475569', boxShadow: r.on ? `0 0 4px ${r.c}` : 'none' }} />
+                  <Typography sx={{ fontSize: 6, color: '#e2e8f0', flex: 1 }}>{r.l}</Typography>
+                  <Box sx={{ width: 16, height: 8, borderRadius: 4, bgcolor: r.on ? alpha(r.c, 0.4) : '#334155', position: 'relative' }}>
+                    <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: r.on ? '#fff' : '#64748b', position: 'absolute', top: 1, left: r.on ? 8 : 1 }} />
+                  </Box>
+                </Box>
+              ))}
+            </Box>
+          );
+
           const screenshots = [
-            { label: 'Main Dashboard', colors: [theme.palette.primary.main, alpha(theme.palette.primary.main, 0.3)], icon: '📊' },
-            { label: 'Trend Analysis', colors: ['#22c55e', alpha('#22c55e', 0.3)], icon: '📈' },
-            { label: 'Alert Configuration', colors: ['#f59e0b', alpha('#f59e0b', 0.3)], icon: '🔔' },
+            { label: 'Main Dashboard', component: <WidgetPreviewDashboard /> },
+            { label: 'Trend Analysis', component: <WidgetPreviewTrend /> },
+            { label: 'Alert Configuration', component: <WidgetPreviewAlerts /> },
           ];
 
           return (
@@ -514,18 +573,15 @@ export default function PulseStudio() {
                         <Box sx={{
                           aspectRatio: '16/10',
                           borderRadius: 2,
-                          background: `linear-gradient(135deg, ${ss.colors[0]} 0%, ${ss.colors[1]} 100%)`,
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'center',
-                          justifyContent: 'center',
                           cursor: 'pointer',
                           transition: 'transform 0.2s',
                           '&:hover': { transform: 'scale(1.03)' },
                           border: `1px solid ${alpha(theme.palette.divider, 0.5)}`,
+                          overflow: 'hidden',
+                          position: 'relative',
                         }}>
-                          <Typography sx={{ fontSize: 28, mb: 0.5 }}>{ss.icon}</Typography>
-                          <Typography variant="caption" sx={{ color: 'white', fontWeight: 600, textShadow: '0 1px 3px rgba(0,0,0,0.3)' }}>{ss.label}</Typography>
+                          {ss.component}
+                          <Typography variant="caption" sx={{ position: 'absolute', bottom: 2, left: 6, color: '#94a3b8', fontWeight: 500, fontSize: '0.55rem' }}>{ss.label}</Typography>
                         </Box>
                       </Grid>
                     ))}
